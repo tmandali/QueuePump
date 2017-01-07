@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -22,12 +23,12 @@ namespace ConsoleApplication5
         {
             var connection = @"Data Source=.\SQLEXPRESS;Initial Catalog=TestDb;Integrated Security=True";
 
-            List<TableQueue> tableQ = new List<TableQueue>() {
-                 new TableQueue(connection,"Tb1"),
-                 new TableQueue(connection,"table 2"),
-                 new TableQueue(connection,"table 3"),
-                 new TableQueue(connection,"table 4"),
-                 new TableQueue(connection,"table 5"),
+            List<ITableQueue> tableQ = new List<ITableQueue>() {
+                 new TableQueue<Tb1>(connection,"Tb1"),
+                 new TableQueue<Tb1>(connection,"Tb1"),
+                 new TableQueue<Tb1>(connection,"Tb1"),
+                 new TableQueue<Tb1>(connection,"Tb1"),
+                 new TableQueue<Tb1>(connection,"Tb1"),
             };
 
             var prs = new Processor();
@@ -38,16 +39,22 @@ namespace ConsoleApplication5
         }
     }
 
+    class Tb1
+    {
+        public int RecId { get; set; }
+        public int Tb1Key { get; set; }
+    }
+
     class Processor
     {
         Task iterator;
         CancellationTokenSource cts;
-        IEnumerable<TableQueue> tableQ;
+        IEnumerable<ITableQueue> tableQ;
         int maxConcurrency = 0;
         TimeSpan retryLoop;
         Action<Exception> ex;
 
-        public void Init(IEnumerable<TableQueue> tableQ, int maxConcurrency, TimeSpan retryLoop, Action<Exception> ex)
+        public void Init(IEnumerable<ITableQueue> tableQ, int maxConcurrency, TimeSpan retryLoop, Action<Exception> ex)
         {
             this.maxConcurrency = maxConcurrency;
             this.tableQ = tableQ.TakeWhile(x => !cts.IsCancellationRequested);
@@ -91,15 +98,16 @@ namespace ConsoleApplication5
         }
     }
 
-    class TableQueue
+    class TableQueue<T> : ITableQueue where T : class, new()
     {
-        public string TableName { get; }
-
+        private string tableName;
         private SqlConnectionFactory connectionFactory;
+        private Dictionary<string, string> endPointList = new Dictionary<string, string>();
 
+       
         public TableQueue(string connection, string tableName)
         {
-            this.TableName = tableName;
+            this.tableName = tableName;
             this.connectionFactory = SqlConnectionFactory.Default(connection);
         }
 
@@ -132,14 +140,64 @@ namespace ConsoleApplication5
             }
         }
 
-        private Task<bool> TryProcess(dynamic message)
+        async Task<bool> TryProcess(dynamic message)
         {
-            return Task.FromResult<bool>(true);
+            var row = new
+            {
+                EndPoint = new UriBuilder("mssql", "localhost.sqlexpress", 1433, "testdb.dbo.sp_ImportXML").Uri,
+                ReplyToAdress = "dbo.sp_ExportXML",
+                Body = "<prms><prm1>1<prm1><prms>",
+            };
+
+            object xml = DBNull.Value;
+
+            using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
+            {
+                var command = new SqlCommand(row.ReplyToAdress, connection);
+                command.CommandType = CommandType.Text;
+
+                ((ICollection<KeyValuePair<string, object>>)message)
+                    .Where(w => w.Key != "EndPoint" && w.Key != "ReplyToAdress" && w.Key != "Body")
+                    .ToList()
+                    .ForEach(f => command.Parameters.AddWithValue('@' + f.Key, f.Value));
+
+                //xml = await command.ExecuteScalarAsync().ConfigureAwait(false);
+            }
+
+            var cnnString = GetEndPointConnection(row.EndPoint);
+
+            using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
+            using (var transaction = connection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+            {
+                var command = new SqlCommand(row.EndPoint.Segments[1], connection, transaction);
+                command.CommandType = CommandType.Text;
+                command.Parameters.AddWithValue("@Xml", xml);
+                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                transaction.Commit();
+            }
+
+            return true;
+        }
+        
+        string GetEndPointConnection(Uri endpoint)
+        {
+            string result;
+
+            if (endPointList.TryGetValue(endpoint.ToString(), out result))
+                return result;
+
+
+            var cnnStr = new SqlConnectionStringBuilder();
+            cnnStr.DataSource = endpoint.Authority.Replace('.','\\');
+            cnnStr.IntegratedSecurity = true;
+            endPointList.Add(endpoint.ToString(), cnnStr.ConnectionString);
+
+            return cnnStr.ConnectionString;
         }
 
         async Task<dynamic> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationToken ct)
-        {
-            var commandText = ""; //Format(Sql.ReceiveText, schemaName, tableName);
+        {            
+            var commandText = $"select top 1 * from dbo.{tableName}"; //Format(Sql.ReceiveText, schemaName, tableName);
 
             using (var command = new SqlCommand(commandText, connection, transaction))
             {
@@ -156,15 +214,30 @@ namespace ConsoleApplication5
                     return null;
                 }
 
-                var readResult = await Read(dataReader).ConfigureAwait(false);
-
-                return readResult;
+                return Read(dataReader);
             }
         }
 
-        async Task<dynamic> Read(IDataReader dr)
-        {
-            return null;
+        static dynamic Read(SqlDataReader dr) 
+        {            
+            var eo = new ExpandoObject();
+            var members = (ICollection<KeyValuePair<string, object>>) eo;
+
+            for (int i = 0; i < dr.FieldCount; i++)
+            {
+                var member = new KeyValuePair<string, object>(dr.GetName(i), dr.GetValue(i));
+                members.Add(member);
+            }
+
+            return eo;
         }
     }
+
+    internal interface ITableQueue
+    {
+        Task Receive(CancellationToken ct);
+    }
+
+
+
 }
