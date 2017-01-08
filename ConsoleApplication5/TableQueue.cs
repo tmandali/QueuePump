@@ -29,16 +29,22 @@ namespace QueueProcessor
 
                     if (envelope == null)
                     {
+                        System.Diagnostics.Trace.TraceInformation($"Not received message");
                         transaction.Commit();
                         return;
                     }
 
+                    System.Diagnostics.Trace.TraceInformation($"Received message");
+
                     if (await TryProcess(envelope).ConfigureAwait(false))
                     {
+
+                        System.Diagnostics.Trace.TraceInformation($"Processed message");
                         transaction.Commit();
                     }
                     else
                     {
+                        System.Diagnostics.Trace.TraceInformation($"Rollback message");
                         transaction.Rollback();
                     }
                 }

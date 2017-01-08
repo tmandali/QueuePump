@@ -10,7 +10,7 @@ namespace QueueProcessor
         static void Main(string[] args)
         {
             AsyncMain().GetAwaiter().GetResult();
-            Console.WriteLine("Tamamlandı ...");
+            System.Diagnostics.Trace.TraceInformation("Tamamlandı ...");
             Console.ReadLine();
         }
 

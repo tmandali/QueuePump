@@ -28,6 +28,7 @@ namespace QueueProcessor
         {
             cts = new CancellationTokenSource();
             iterator = Task.Run(Receive, CancellationToken.None);
+            System.Diagnostics.Trace.TraceInformation("Processor started ...");
         }
 
         public async Task Stop()
@@ -41,6 +42,7 @@ namespace QueueProcessor
                 throw new TimeoutException("Processor cancel timeout !");
 
             cts.Dispose();
+            System.Diagnostics.Trace.TraceInformation("Processor stoped ...");
         }
 
         async Task Receive()
@@ -53,9 +55,11 @@ namespace QueueProcessor
                     .WithDegreeOfParallelism(maxConcurrency)
                     .ForAll(q => q.Receive(cts.Token).ContinueWith(x => {
                         if (x.IsFaulted)
-                            ex(x.Exception);
+                            System.Diagnostics.Trace.TraceError(x.Exception.InnerException.Message);
+                            //ex(x.Exception);
                     }).GetAwaiter().GetResult());
 
+                System.Diagnostics.Trace.TraceInformation($"Wait time {retryLoop}");
                 await Task.Delay(retryLoop, cts.Token);
             }
         }
