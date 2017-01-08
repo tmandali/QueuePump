@@ -7,8 +7,8 @@
     <ProjectGuid>{EC0433E3-85CE-483C-AB99-694FF665CF72}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ConsoleApplication5</RootNamespace>
-    <AssemblyName>ConsoleApplication5</AssemblyName>
+    <RootNamespace>QueueProcessor</RootNamespace>
+    <AssemblyName>QueueProcessor</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -45,6 +45,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="EndPoint.cs" />
+    <Compile Include="SqlEndPoint.cs" />
+    <Compile Include="Envelope.cs" />
+    <Compile Include="Processor.cs" />
+    <Compile Include="IQueue.cs" />
+    <Compile Include="TableQueue.cs" />
     <Compile Include="SqlConnectionFactory.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

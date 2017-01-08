@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApplication5", "ConsoleApplication5\ConsoleApplication5.csproj", "{EC0433E3-85CE-483C-AB99-694FF665CF72}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QueueProcessor", "ConsoleApplication5\QueueProcessor.csproj", "{EC0433E3-85CE-483C-AB99-694FF665CF72}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
