@@ -26,14 +26,10 @@ namespace ConsoleApplication5
 
             List<ITableQueue> tableQ = new List<ITableQueue>() {
                  new TableQueue(connection,"Test"),
-                 //new TableQueue<Tb1>(connection,"Tb1"),
-                 //new TableQueue<Tb1>(connection,"Tb1"),
-                 //new TableQueue<Tb1>(connection,"Tb1"),
-                 //new TableQueue<Tb1>(connection,"Tb1"),
             };
 
             var prs = new Processor();
-            prs.Init(tableQ, 2, TimeSpan.Zero, ex => Console.WriteLine(ex));
+            prs.Init(tableQ, 2, TimeSpan.FromSeconds(5), ex => Console.WriteLine(ex));
             prs.Start();
             Console.ReadLine();
             await prs.Stop();
@@ -209,7 +205,7 @@ namespace ConsoleApplication5
             var finishedTask = await Task.WhenAny(iterator, timeoutTask);
 
             if (finishedTask == timeoutTask)
-                //throw new OperationCanceledException(cts.Token);
+                throw new TimeoutException("Processor cancel timeout !");
 
             cts.Dispose();
         }
