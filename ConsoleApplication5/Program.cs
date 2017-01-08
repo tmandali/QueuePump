@@ -129,7 +129,7 @@ namespace ConsoleApplication5
                         return;
                     }
 
-                    if (await TryProcess(message, connection, transaction).ConfigureAwait(false))
+                    if (await TryProcess(message).ConfigureAwait(false))
                     {
                         transaction.Commit();
                     }
@@ -141,22 +141,24 @@ namespace ConsoleApplication5
             }
         }
 
-        async Task<bool> TryProcess(dynamic message, SqlConnection connection, SqlTransaction transaction)
+        async Task<bool> TryProcess(dynamic message)
         {
             XmlReader xmlReader = null;
 
-            var command = new SqlCommand(message.ReplyToAdress, connection, transaction);
-            command.CommandType = CommandType.StoredProcedure;
+            using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
+            using (var transaction = connection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+            {
+                var command = new SqlCommand(message.ReplyToAdress, connection, transaction);
+                command.CommandType = CommandType.StoredProcedure;
 
-            ((ICollection<KeyValuePair<string, object>>)message)
-                .Where(w => w.Key != "EndPoint" && w.Key != "ReplyToAdress")
-                .ToList()
-                .ForEach(f => command.Parameters.AddWithValue('@' + f.Key, f.Value));
+                ((ICollection<KeyValuePair<string, object>>)message)
+                    .Where(w => w.Key != "EndPoint" && w.Key != "ReplyToAdress")
+                    .ToList()
+                    .ForEach(f => command.Parameters.AddWithValue('@' + f.Key, f.Value));
 
-            xmlReader = await command.ExecuteXmlReaderAsync().ConfigureAwait(false);
-
-            if (xmlReader == null)
-                return true;
+                xmlReader = await command.ExecuteXmlReaderAsync().ConfigureAwait(false);
+                transaction.Commit();
+            }
 
             return await EndPointProcess(new Uri(message.EndPoint), xmlReader).ConfigureAwait(false);
         }
@@ -178,10 +180,23 @@ namespace ConsoleApplication5
         }
 
         async Task<dynamic> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationToken ct)
-        {            
-            var commandText = $"select top 1 * from dbo.{tableName}"; //Format(Sql.ReceiveText, schemaName, tableName);
+        {
+            string receiveText = $@"
+            DECLARE @NOCOUNT VARCHAR(3) = 'OFF';
+            IF ( (512 & @@OPTIONS) = 512 ) SET @NOCOUNT = 'ON';
+            SET NOCOUNT ON;
 
-            using (var command = new SqlCommand(commandText, connection, transaction))
+            --OUTPUT deleted.Id, deleted.CorrelationId, deleted.ReplyToAddress, deleted.Recoverable, deleted.Headers, deleted.Body;
+
+            WITH message AS (SELECT TOP(1) * FROM dbo.{tableName} WITH (UPDLOCK, READPAST, ROWLOCK)) -- WHERE [Expires] IS NULL OR [Expires] > GETUTCDATE() ORDER BY [RowVersion]
+            DELETE FROM message
+            OUTPUT deleted.*;
+            IF(@NOCOUNT = 'ON') SET NOCOUNT ON;
+            IF(@NOCOUNT = 'OFF') SET NOCOUNT OFF;";
+
+            //var commandText = $"select top 1 * from dbo."; //Format(Sql.ReceiveText, schemaName, tableName);
+
+            using (var command = new SqlCommand(receiveText, connection, transaction))
             {
                 return await ReadMessage(command).ConfigureAwait(false);
             }
@@ -225,11 +240,6 @@ namespace ConsoleApplication5
             return await dataReader.GetFieldValueAsync<T>(index).ConfigureAwait(false);
         }
     }
-
-
-
-
-
 
     internal interface ITableQueue
     {

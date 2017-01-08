@@ -8,7 +8,8 @@ GO
 ALTER PROCEDURE [dbo].[sp_ExportTest]
 	@Id int
 AS
-	SELECT Id FROM Test where Id=@Id FOR XML AUTO, TYPE
+	SELECT * FROM (SELECT @Id Id) Export FOR XML AUTO, TYPE
+	--SELECT Id FROM Test where Id=@Id FOR XML AUTO, TYPE
 GO
 
 CREATE TABLE [dbo].[Test_Log]
@@ -29,9 +30,9 @@ DELETE Test
 INSERT INTO [dbo].[Test] (Id, ReplyToAdress, EndPoint) 
 VALUES (1, 'dbo.sp_ExportTest','mssql://localhost/testdb.dbo.sp_ImportTest')
 
-EXEC sp_ExportTest 1
+EXEC sp_ExportTest 111
 
-
+DELETE Test_Log
 SELECT * FROM Test_Log
 
 
