@@ -5,7 +5,6 @@ using System.Data.SqlClient;
 using System.Data.SqlTypes;
 using System.Dynamic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
@@ -26,7 +25,7 @@ namespace ConsoleApplication5
             var connection = @"Data Source=.\SQLEXPRESS;Initial Catalog=TestDb;Integrated Security=True";
 
             List<ITableQueue> tableQ = new List<ITableQueue>() {
-                 new TableQueue<Tb1>(connection,"Test"),
+                 new TableQueue(connection,"Test"),
                  //new TableQueue<Tb1>(connection,"Tb1"),
                  //new TableQueue<Tb1>(connection,"Tb1"),
                  //new TableQueue<Tb1>(connection,"Tb1"),
@@ -41,10 +40,142 @@ namespace ConsoleApplication5
         }
     }
 
-    class Tb1
+    public abstract class EndPoint
     {
-        public int RecId { get; set; }
-        public int Tb1Key { get; set; }
+        public abstract Task<bool> Send(string from, XmlReader reader);
+        protected abstract void Init(Uri adress);
+        public static Task<EndPoint> Factory(Envelope envelope)
+        {
+            EndPoint result;
+
+            switch (envelope.EndPoint.Scheme)
+            {
+                case "mssql":
+                    result = new SqlEndPoint();
+                    break;
+                default:
+                    throw new Exception($"{envelope.EndPoint.Scheme} desteklenmityor !");
+            }
+
+            result.Init(envelope.EndPoint);
+            return Task.FromResult(result);
+        }
+    }
+
+    public class SqlEndPoint : EndPoint
+    {
+        private SqlConnectionFactory sqlConnectionFactory;
+        private string procedureName;
+        private string endPoint;
+
+        protected override void Init(Uri adress)
+        {
+            endPoint = adress.ToString();
+            var connection = System.Configuration.ConfigurationManager.ConnectionStrings[adress.Host].ConnectionString;
+            sqlConnectionFactory = SqlConnectionFactory.Default(connection);
+            procedureName = adress.Segments[1];
+        }
+
+        public override async Task<bool> Send(string from, XmlReader reader)
+        {
+            using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
+            using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
+            {
+                var commmand = new SqlCommand(procedureName, connection, transaction);
+                commmand.CommandType = CommandType.StoredProcedure;
+                commmand.Parameters.AddWithValue("@From", from);
+                commmand.Parameters.AddWithValue("@Xml", new SqlXml(reader));
+                await commmand.ExecuteNonQueryAsync();
+                transaction.Commit();
+                return true;
+            }
+        }
+    }
+
+    public class Envelope
+    {
+        public Uri EndPoint { get; set; }
+
+        public string ReplyTo { get; set; }
+
+        public dynamic Headers { get; set; }
+
+
+        public void PrepareExportCommand(SqlCommand command)
+        {
+            command.CommandType = CommandType.StoredProcedure;
+            command.Parameters.AddWithValue("@To", EndPoint.ToString());
+
+            var headers = (ICollection<KeyValuePair<string, object>>) Headers;
+            foreach (var prm in headers)
+            {
+                command.Parameters.AddWithValue('@'+prm.Key, prm.Value ?? DBNull.Value);
+            }
+        }
+
+        static T TryGetHeaderValue<T>(Dictionary<string, string> headers, string name, Func<string, T> conversion)
+        {
+            string text;
+            if (!headers.TryGetValue(name, out text))
+            {
+                return default(T);
+            }
+            var value = conversion(text);
+            return value;
+        }
+
+
+        public static async Task<Envelope> Read(SqlDataReader dataReader)
+        {
+            var result = await ReadRow(dataReader);
+            return result.TryParse();
+        }
+
+        Envelope TryParse()
+        {
+            try
+            {
+                if (EndPoint.Scheme != "mssql")
+                    throw new Exception("Desteklenmeyen endpoint !");
+                return this;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        static async Task<Envelope> ReadRow(SqlDataReader dataReader)
+        {
+            var envelope = new Envelope();
+            envelope.Headers = new ExpandoObject();
+
+            var headers = (ICollection<KeyValuePair<string, object>>)envelope.Headers;
+            for (int i = 0; i < dataReader.FieldCount; i++)
+            {
+                string name = dataReader.GetName(i);
+
+                if (name == "EndPoint")
+                    envelope.EndPoint = new Uri(await dataReader.GetFieldValueAsync<string>(i).ConfigureAwait(false));
+                else if (name == "ReplyTo")
+                    envelope.ReplyTo = await dataReader.GetFieldValueAsync<string>(i).ConfigureAwait(false);
+                else
+                    headers.Add(new KeyValuePair<string, object>(name, await GetNullableAsync<object>(dataReader, i)));
+            }
+
+            envelope.Headers = headers;
+            return envelope;
+        }
+
+        static async Task<T> GetNullableAsync<T>(SqlDataReader dataReader, int index) where T : class
+        {
+            if (await dataReader.IsDBNullAsync(index).ConfigureAwait(false))
+            {
+                return default(T);
+            }
+
+            return await dataReader.GetFieldValueAsync<T>(index).ConfigureAwait(false);
+        }
     }
 
     class Processor
@@ -101,7 +232,7 @@ namespace ConsoleApplication5
         }
     }
 
-    class TableQueue<T> : ITableQueue where T : class, new()
+    class TableQueue : ITableQueue 
     {
         private string tableName;
         private SqlConnectionFactory connectionFactory;        
@@ -116,20 +247,20 @@ namespace ConsoleApplication5
         {
             while (!ct.IsCancellationRequested)
             {
-                dynamic message = null;
+                Envelope envelope = null;
 
                 using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
-                using (var transaction = connection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+                using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
                 {
-                    message = await TryReceive(connection, transaction, ct).ConfigureAwait(false);
+                    envelope = await TryReceive(connection, transaction, ct).ConfigureAwait(false);
 
-                    if (message == null)
+                    if (envelope == null)
                     {
                         transaction.Commit();
                         return;
                     }
 
-                    if (await TryProcess(message).ConfigureAwait(false))
+                    if (await TryProcess(envelope).ConfigureAwait(false))
                     {
                         transaction.Commit();
                     }
@@ -141,45 +272,27 @@ namespace ConsoleApplication5
             }
         }
 
-        async Task<bool> TryProcess(dynamic message)
+        async Task<bool> TryProcess(Envelope envelope)
         {
-            XmlReader xmlReader = null;
+            bool result = false;
 
             using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
-            using (var transaction = connection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+            using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
             {
-                var command = new SqlCommand(message.ReplyToAdress, connection, transaction);
-                command.CommandType = CommandType.StoredProcedure;
+                var command = new SqlCommand(envelope.ReplyTo, connection, transaction);
+                envelope.PrepareExportCommand(command);                                    
+                var xmlReader = await command.ExecuteXmlReaderAsync().ConfigureAwait(false);
 
-                ((ICollection<KeyValuePair<string, object>>)message)
-                    .Where(w => w.Key != "EndPoint" && w.Key != "ReplyToAdress")
-                    .ToList()
-                    .ForEach(f => command.Parameters.AddWithValue('@' + f.Key, f.Value));
+                var endPoint = await EndPoint.Factory(envelope);
+                result = await endPoint.Send(tableName, xmlReader);
 
-                xmlReader = await command.ExecuteXmlReaderAsync().ConfigureAwait(false);
                 transaction.Commit();
             }
 
-            return await EndPointProcess(new Uri(message.EndPoint), xmlReader).ConfigureAwait(false);
+            return result;
         }
         
-        async Task<bool> EndPointProcess(Uri endPoint, XmlReader xmlReader)
-        {
-            var cnnString = System.Configuration.ConfigurationManager.ConnectionStrings[endPoint.Host].ConnectionString;
-            using (var epConnection = await SqlConnectionFactory.Default(cnnString).OpenNewConnection().ConfigureAwait(false))
-            using (var epTransaction = epConnection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
-            {
-                var epCommand = new SqlCommand(endPoint.Segments[1], epConnection, epTransaction);
-                epCommand.CommandType = CommandType.StoredProcedure;
-                epCommand.Parameters.AddWithValue("@EndPoint", endPoint.ToString());
-                epCommand.Parameters.AddWithValue("@Xml", new SqlXml(xmlReader));
-                await epCommand.ExecuteNonQueryAsync().ConfigureAwait(false);
-                epTransaction.Commit();
-            }
-            return true;
-        }
-
-        async Task<dynamic> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationToken ct)
+        async Task<Envelope> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationToken ct)
         {
             string receiveText = $@"
             DECLARE @NOCOUNT VARCHAR(3) = 'OFF';
@@ -194,15 +307,13 @@ namespace ConsoleApplication5
             IF(@NOCOUNT = 'ON') SET NOCOUNT ON;
             IF(@NOCOUNT = 'OFF') SET NOCOUNT OFF;";
 
-            //var commandText = $"select top 1 * from dbo."; //Format(Sql.ReceiveText, schemaName, tableName);
-
             using (var command = new SqlCommand(receiveText, connection, transaction))
             {
                 return await ReadMessage(command).ConfigureAwait(false);
             }
         }
 
-        async Task<dynamic> ReadMessage(SqlCommand command)
+        async Task<Envelope> ReadMessage(SqlCommand command)
         {
             using (var dataReader = await command.ExecuteReaderAsync(CommandBehavior.SingleRow | CommandBehavior.SequentialAccess).ConfigureAwait(false))
             {
@@ -211,33 +322,8 @@ namespace ConsoleApplication5
                     return null;
                 }
 
-                return await Read(dataReader).ConfigureAwait(false);
+                return await Envelope.Read(dataReader).ConfigureAwait(false);
             }
-        }
-
-        static async Task<dynamic> Read(SqlDataReader dr) 
-        {            
-            var eo = new ExpandoObject();
-            var members = (ICollection<KeyValuePair<string, object>>) eo;
-
-            for (int i = 0; i < dr.FieldCount; i++)
-            {
-                string name = dr.GetName(i);
-                object value = await GetNullableAsync<object>(dr, i);
-                members.Add(new KeyValuePair<string, object>(name, value));
-            }
-
-            return eo;
-        }
-
-        static async Task<T> GetNullableAsync<T>(SqlDataReader dataReader, int index) where T : class
-        {
-            if (await dataReader.IsDBNullAsync(index).ConfigureAwait(false))
-            {
-                return default(T);
-            }
-
-            return await dataReader.GetFieldValueAsync<T>(index).ConfigureAwait(false);
         }
     }
 
