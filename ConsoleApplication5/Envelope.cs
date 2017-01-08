@@ -51,7 +51,7 @@ namespace QueueProcessor
             try
             {
                 if (EndPoint.Scheme != "mssql")
-                    throw new Exception("Desteklenmeyen endpoint !");
+                    throw new Exception("Not supported endpoint !");
                 return this;
             }
             catch (Exception ex)

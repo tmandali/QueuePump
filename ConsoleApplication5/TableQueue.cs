@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,6 +21,9 @@ namespace QueueProcessor
         {
             while (!ct.IsCancellationRequested)
             {
+                var stopwatch = Stopwatch.StartNew();
+
+                
                 Envelope envelope = null;
 
                 using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
@@ -27,24 +31,28 @@ namespace QueueProcessor
                 {
                     envelope = await TryReceive(connection, transaction, ct).ConfigureAwait(false);
 
+                    stopwatch.Stop();
+                  
                     if (envelope == null)
                     {
-                        System.Diagnostics.Trace.TraceInformation($"Not received message");
+                        Trace.TraceInformation($"Not received message {stopwatch.Elapsed}");
                         transaction.Commit();
                         return;
                     }
 
-                    System.Diagnostics.Trace.TraceInformation($"Received message");
+                    Trace.TraceInformation($"Received message {stopwatch.Elapsed}");
+
+                    stopwatch.Start();
 
                     if (await TryProcess(envelope).ConfigureAwait(false))
                     {
-
-                        System.Diagnostics.Trace.TraceInformation($"Processed message");
+                        stopwatch.Stop();
+                        Trace.TraceInformation($"Processed message {stopwatch.Elapsed}");
                         transaction.Commit();
                     }
                     else
                     {
-                        System.Diagnostics.Trace.TraceInformation($"Rollback message");
+                        Trace.TraceInformation($"Rollback message");
                         transaction.Rollback();
                     }
                 }
@@ -100,7 +108,6 @@ namespace QueueProcessor
                 {
                     return null;
                 }
-
                 return await Envelope.Read(dataReader).ConfigureAwait(false);
             }
         }
