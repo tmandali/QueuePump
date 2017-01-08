@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Data.SqlTypes;
 using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 
 namespace ConsoleApplication5
 {
@@ -24,11 +26,11 @@ namespace ConsoleApplication5
             var connection = @"Data Source=.\SQLEXPRESS;Initial Catalog=TestDb;Integrated Security=True";
 
             List<ITableQueue> tableQ = new List<ITableQueue>() {
-                 new TableQueue<Tb1>(connection,"Tb1"),
-                 new TableQueue<Tb1>(connection,"Tb1"),
-                 new TableQueue<Tb1>(connection,"Tb1"),
-                 new TableQueue<Tb1>(connection,"Tb1"),
-                 new TableQueue<Tb1>(connection,"Tb1"),
+                 new TableQueue<Tb1>(connection,"Test"),
+                 //new TableQueue<Tb1>(connection,"Tb1"),
+                 //new TableQueue<Tb1>(connection,"Tb1"),
+                 //new TableQueue<Tb1>(connection,"Tb1"),
+                 //new TableQueue<Tb1>(connection,"Tb1"),
             };
 
             var prs = new Processor();
@@ -90,7 +92,8 @@ namespace ConsoleApplication5
                     .WithCancellation(cts.Token)
                     .WithDegreeOfParallelism(maxConcurrency)
                     .ForAll(q => q.Receive(cts.Token).ContinueWith(x => {
-                        if (x.IsFaulted) ex(x.Exception);
+                        if (x.IsFaulted)
+                            ex(x.Exception);
                     }).GetAwaiter().GetResult());
 
                 await Task.Delay(retryLoop, cts.Token);
@@ -101,9 +104,7 @@ namespace ConsoleApplication5
     class TableQueue<T> : ITableQueue where T : class, new()
     {
         private string tableName;
-        private SqlConnectionFactory connectionFactory;
-        private Dictionary<string, string> endPointList = new Dictionary<string, string>();
-
+        private SqlConnectionFactory connectionFactory;        
        
         public TableQueue(string connection, string tableName)
         {
@@ -128,7 +129,7 @@ namespace ConsoleApplication5
                         return;
                     }
 
-                    if (await TryProcess(message).ConfigureAwait(false))
+                    if (await TryProcess(message, connection, transaction).ConfigureAwait(false))
                     {
                         transaction.Commit();
                     }
@@ -140,59 +141,40 @@ namespace ConsoleApplication5
             }
         }
 
-        async Task<bool> TryProcess(dynamic message)
+        async Task<bool> TryProcess(dynamic message, SqlConnection connection, SqlTransaction transaction)
         {
-            var row = new
-            {
-                EndPoint = new UriBuilder("mssql", "localhost.sqlexpress", 1433, "testdb.dbo.sp_ImportXML").Uri,
-                ReplyToAdress = "dbo.sp_ExportXML",
-                Body = "<prms><prm1>1<prm1><prms>",
-            };
+            XmlReader xmlReader = null;
 
-            object xml = DBNull.Value;
+            var command = new SqlCommand(message.ReplyToAdress, connection, transaction);
+            command.CommandType = CommandType.StoredProcedure;
 
-            using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
-            {
-                var command = new SqlCommand(row.ReplyToAdress, connection);
-                command.CommandType = CommandType.Text;
+            ((ICollection<KeyValuePair<string, object>>)message)
+                .Where(w => w.Key != "EndPoint" && w.Key != "ReplyToAdress")
+                .ToList()
+                .ForEach(f => command.Parameters.AddWithValue('@' + f.Key, f.Value));
 
-                ((ICollection<KeyValuePair<string, object>>)message)
-                    .Where(w => w.Key != "EndPoint" && w.Key != "ReplyToAdress" && w.Key != "Body")
-                    .ToList()
-                    .ForEach(f => command.Parameters.AddWithValue('@' + f.Key, f.Value));
+            xmlReader = await command.ExecuteXmlReaderAsync().ConfigureAwait(false);
 
-                //xml = await command.ExecuteScalarAsync().ConfigureAwait(false);
-            }
+            if (xmlReader == null)
+                return true;
 
-            var cnnString = GetEndPointConnection(row.EndPoint);
-
-            using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
-            using (var transaction = connection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
-            {
-                var command = new SqlCommand(row.EndPoint.Segments[1], connection, transaction);
-                command.CommandType = CommandType.Text;
-                command.Parameters.AddWithValue("@Xml", xml);
-                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
-                transaction.Commit();
-            }
-
-            return true;
+            return await EndPointProcess(new Uri(message.EndPoint), xmlReader).ConfigureAwait(false);
         }
         
-        string GetEndPointConnection(Uri endpoint)
+        async Task<bool> EndPointProcess(Uri endPoint, XmlReader xmlReader)
         {
-            string result;
-
-            if (endPointList.TryGetValue(endpoint.ToString(), out result))
-                return result;
-
-
-            var cnnStr = new SqlConnectionStringBuilder();
-            cnnStr.DataSource = endpoint.Authority.Replace('.','\\');
-            cnnStr.IntegratedSecurity = true;
-            endPointList.Add(endpoint.ToString(), cnnStr.ConnectionString);
-
-            return cnnStr.ConnectionString;
+            var cnnString = System.Configuration.ConfigurationManager.ConnectionStrings[endPoint.Host].ConnectionString;
+            using (var epConnection = await SqlConnectionFactory.Default(cnnString).OpenNewConnection().ConfigureAwait(false))
+            using (var epTransaction = epConnection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted))
+            {
+                var epCommand = new SqlCommand(endPoint.Segments[1], epConnection, epTransaction);
+                epCommand.CommandType = CommandType.StoredProcedure;
+                epCommand.Parameters.AddWithValue("@EndPoint", endPoint.ToString());
+                epCommand.Parameters.AddWithValue("@Xml", new SqlXml(xmlReader));
+                await epCommand.ExecuteNonQueryAsync().ConfigureAwait(false);
+                epTransaction.Commit();
+            }
+            return true;
         }
 
         async Task<dynamic> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationToken ct)
@@ -214,30 +196,43 @@ namespace ConsoleApplication5
                     return null;
                 }
 
-                return Read(dataReader);
+                return await Read(dataReader).ConfigureAwait(false);
             }
         }
 
-        static dynamic Read(SqlDataReader dr) 
+        static async Task<dynamic> Read(SqlDataReader dr) 
         {            
             var eo = new ExpandoObject();
             var members = (ICollection<KeyValuePair<string, object>>) eo;
 
             for (int i = 0; i < dr.FieldCount; i++)
             {
-                var member = new KeyValuePair<string, object>(dr.GetName(i), dr.GetValue(i));
-                members.Add(member);
+                string name = dr.GetName(i);
+                object value = await GetNullableAsync<object>(dr, i);
+                members.Add(new KeyValuePair<string, object>(name, value));
             }
 
             return eo;
         }
+
+        static async Task<T> GetNullableAsync<T>(SqlDataReader dataReader, int index) where T : class
+        {
+            if (await dataReader.IsDBNullAsync(index).ConfigureAwait(false))
+            {
+                return default(T);
+            }
+
+            return await dataReader.GetFieldValueAsync<T>(index).ConfigureAwait(false);
+        }
     }
+
+
+
+
+
 
     internal interface ITableQueue
     {
         Task Receive(CancellationToken ct);
     }
-
-
-
 }
