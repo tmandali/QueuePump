@@ -5,6 +5,7 @@ using System.Data.SqlClient;
 using System.Threading.Tasks;
 using System.Linq;
 using Dapper;
+using System.Xml;
 
 namespace QueueProcessor
 {
@@ -31,12 +32,21 @@ namespace QueueProcessor
         public IEnumerable<IQueue> GetQueueList()
         {
             var connectionString = ConfigurationManager.ConnectionStrings["localhost"].ConnectionString;
-
+            
             using (var connection = new SqlConnection(connectionString))
             {
-                return connection.Query("select QueueName, ConnectionString from QueuePump")
-                    .Select(s => new TableQueue(s.ConnectionString, s.QueueName));                
+                connection.Open();
+                var command = new SqlCommand("SELECT [Table], [ConnectionString], [Schema] FROM [Queue]", connection);
+                var dataReader = command.ExecuteReader();
+                while (dataReader.Read())
+                {
+                    XmlReader schema = null;
+                    if (!dataReader.GetSqlXml(2).IsNull)
+                        schema = dataReader.GetSqlXml(2).CreateReader();
+
+                    yield return new TableQueue(dataReader.GetFieldValue<string>(0), dataReader.GetFieldValue<string>(1), schema);
+                }
             }
-        }
+        }        
     }    
 }

@@ -4,18 +4,22 @@ using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
+using System.Xml.Schema;
 
 namespace QueueProcessor
 {
     class TableQueue : IQueue
     {
-        private string tableName;
-        private SqlConnectionFactory connectionFactory;
+        string tableName;
+        SqlConnectionFactory connectionFactory;
+        XmlReader schema;
 
-        public TableQueue(string connection, string tableName)
+        public TableQueue(string tableName, string connection, XmlReader schema)
         {
             this.tableName = tableName;
             this.connectionFactory = SqlConnectionFactory.Default(connection);
+            this.schema = schema;
         }
 
         public async Task Receive(CancellationToken ct)
@@ -70,6 +74,19 @@ namespace QueueProcessor
                 envelope.PrepareExportCommand(command);
                 var xmlReader = await command.ExecuteXmlReaderAsync().ConfigureAwait(false);
 
+                if (schema != null)
+                {
+                    XmlReaderSettings settings = new XmlReaderSettings();
+                    settings.ConformanceLevel = ConformanceLevel.Auto;
+                    settings.ValidationType = ValidationType.Schema;
+                    settings.ValidationFlags |= XmlSchemaValidationFlags.ProcessInlineSchema;
+                    settings.ValidationFlags |= XmlSchemaValidationFlags.ProcessSchemaLocation;
+                    settings.ValidationFlags |= XmlSchemaValidationFlags.ReportValidationWarnings;
+                    settings.ValidationEventHandler += new ValidationEventHandler(ValidationCallBack);
+                    settings.Schemas.Add("http://www.lcwaikiki.com/queue." + tableName, schema);
+                    xmlReader = XmlReader.Create(xmlReader, settings);
+                }
+
                 envelope.MessageId = (Guid) command.Parameters["@MessageId"].Value;
 
                 var endPoint = await EndPoint.Factory(envelope);
@@ -79,6 +96,14 @@ namespace QueueProcessor
             }
 
             return result;
+        }
+
+        private void ValidationCallBack(object sender, ValidationEventArgs args)
+        {
+            if (args.Severity == XmlSeverityType.Warning)
+                Trace.TraceWarning(args.Message);
+            else         
+                throw new XmlSchemaValidationException(args.Message, args.Exception);
         }
 
         async Task<Envelope> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationToken ct)
