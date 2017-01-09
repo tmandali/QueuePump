@@ -90,7 +90,7 @@ namespace QueueProcessor
 
             --OUTPUT deleted.Id, deleted.CorrelationId, deleted.ReplyToAddress, deleted.Recoverable, deleted.Headers, deleted.Body;
 
-            WITH message AS (SELECT TOP(1) * FROM dbo.{tableName} WITH (UPDLOCK, READPAST, ROWLOCK)) -- WHERE [Expires] IS NULL OR [Expires] > GETUTCDATE() ORDER BY [RowVersion]
+            WITH message AS (SELECT TOP(1) * FROM {tableName} WITH (UPDLOCK, READPAST, ROWLOCK)) -- WHERE [Expires] IS NULL OR [Expires] > GETUTCDATE() ORDER BY [RowVersion]
             DELETE FROM message
             OUTPUT deleted.*;
             IF(@NOCOUNT = 'ON') SET NOCOUNT ON;

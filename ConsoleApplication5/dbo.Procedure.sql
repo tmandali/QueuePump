@@ -1,13 +1,41 @@
-﻿ALTER PROCEDURE [dbo].[sp_ImportTest]
+﻿CREATE TABLE QueuePump
+(	
+	QueueName SYSNAME,
+	ConnectionString VARCHAR(400),
+)
+
+INSERT INTO QueuePump
+SELECT 'dbo.Test', 'Data Source=.\SQLEXPRESS;Initial Catalog=nservicebus;Integrated Security=True'
+
+GO
+
+CREATE TABLE [dbo].[Test_Log]
+(
+	[MessageId] UNIQUEIDENTIFIER NOT NULL,
+	[Xml] XML NOT NULL 	
+)
+
+GO
+
+CREATE TABLE [dbo].[Test]
+(
+	[Id] INT NOT NULL PRIMARY KEY, 
+    [ReplyTo] NVARCHAR(900) NOT NULL, 
+    [EndPoint] NVARCHAR(900) NOT NULL
+)
+
+GO
+
+CREATE PROCEDURE [dbo].[sp_ImportTest]
 	@MessageId uniqueidentifier,	
 	@From NVARCHAR(900),
 	@Xml xml
 AS	
 	WAITFOR DELAY '00:00:10';
-	INSERT INTO Test_Log (Id, Xml) VALUES (@MessageId, @Xml)
+	INSERT INTO Test_Log (MessageId, Xml) VALUES (@MessageId, @Xml)
 GO
 
-ALTER PROCEDURE [dbo].[sp_ExportTest]
+CREATE PROCEDURE [dbo].[sp_ExportTest]
 	@MessageId uniqueidentifier out,
 	@To NVARCHAR(900),	
 	@Id int
@@ -17,19 +45,6 @@ AS
 	WAITFOR DELAY '00:00:05';
 	SELECT * FROM (SELECT @MessageId MessageId, @Id Id) Export FOR XML AUTO, TYPE
 GO
-
-CREATE TABLE [dbo].[Test_Log]
-(
-	[Id] UNIQUEIDENTIFIER NOT NULL,
-	[Xml] XML NOT NULL 	
-)
-
-CREATE TABLE [dbo].[Test]
-(
-	[Id] INT NOT NULL PRIMARY KEY, 
-    [ReplyTo] NVARCHAR(900) NOT NULL, 
-    [EndPoint] NVARCHAR(900) NOT NULL
-)
 
 DELETE Test
 

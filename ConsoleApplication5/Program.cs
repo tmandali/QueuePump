@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
+using System.Linq;
+using Dapper;
 
 namespace QueueProcessor
 {
@@ -9,23 +12,31 @@ namespace QueueProcessor
     {
         static void Main(string[] args)
         {
-            AsyncMain().GetAwaiter().GetResult();
+            var prg = new Program();
+            AsyncMain(prg).GetAwaiter().GetResult();
             Console.ReadLine();
         }
 
-        async static Task AsyncMain()
+        async static Task AsyncMain(Program prg)
         {
-            var connection = ConfigurationManager.ConnectionStrings["localhost"].ConnectionString; 
-
-            List<IQueue> queueList = new List<IQueue>() {
-                 new TableQueue(connection,"Test"),
-            };
-
             var prs = new Processor();
-            prs.Init(queueList, 2, TimeSpan.FromSeconds(5), ex => Console.WriteLine(ex));
+            prs.Init(prg.GetQueueList, 3, 
+                TimeSpan.FromSeconds(5), 
+                ex => System.Diagnostics.Trace.TraceError(ex.InnerException.Message));
             prs.Start();
             Console.ReadLine();
             await prs.Stop();
+        }
+
+        public IEnumerable<IQueue> GetQueueList()
+        {
+            var connectionString = ConfigurationManager.ConnectionStrings["localhost"].ConnectionString;
+
+            using (var connection = new SqlConnection(connectionString))
+            {
+                return connection.Query("select QueueName, ConnectionString from QueuePump")
+                    .Select(s => new TableQueue(s.ConnectionString, s.QueueName));                
+            }
         }
     }    
 }

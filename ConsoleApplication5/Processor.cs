@@ -6,22 +6,24 @@ using System.Threading.Tasks;
 
 namespace QueueProcessor
 {
-
     class Processor
     {
         Task iterator;
         CancellationTokenSource cts;
-        IEnumerable<IQueue> queueList;
         int maxConcurrency = 0;
         TimeSpan retryLoop;
         Action<Exception> ex;
+        Action<Processor> iteration;
 
-        public void Init(IEnumerable<IQueue> queueList, int maxConcurrency, TimeSpan retryLoop, Action<Exception> ex)
+        Func<IEnumerable<IQueue>> queueList;
+
+        public void Init(Func<IEnumerable<IQueue>> queueList, int maxConcurrency, TimeSpan retryLoop, Action<Exception> ex)
         {
             this.maxConcurrency = maxConcurrency;
-            this.queueList = queueList.TakeWhile(x => !cts.IsCancellationRequested);
+            //this.queueList = queueList.TakeWhile(x => !cts.IsCancellationRequested);
             this.retryLoop = retryLoop;
             this.ex = ex;
+            this.queueList = queueList;
         }
 
         public void Start()
@@ -49,14 +51,13 @@ namespace QueueProcessor
         {
             while (!cts.IsCancellationRequested)
             {
-                queueList
+                queueList()
                     .AsParallel()
                     .WithCancellation(cts.Token)
                     .WithDegreeOfParallelism(maxConcurrency)
                     .ForAll(q => q.Receive(cts.Token).ContinueWith(x => {
                         if (x.IsFaulted)
-                            System.Diagnostics.Trace.TraceError(x.Exception.InnerException.Message);
-                            //ex(x.Exception);
+                            ex(x.Exception);
                     }).GetAwaiter().GetResult());
 
                 System.Diagnostics.Trace.TraceInformation($"Wait time {retryLoop}");
