@@ -21,16 +21,19 @@ namespace QueueProcessor
             procedureName = adress.Segments[1];
         }
 
-        public override async Task<bool> Send(string from, XmlReader reader)
+        public override async Task<bool> Send(Guid messageId, string from, XmlReader reader)
         {
             using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
             using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
             {
                 var commmand = new SqlCommand(procedureName, connection, transaction);
                 commmand.CommandType = CommandType.StoredProcedure;
+                commmand.Parameters.AddWithValue("@MessageId", messageId);
                 commmand.Parameters.AddWithValue("@From", from);
                 commmand.Parameters.AddWithValue("@Xml", new SqlXml(reader));
-                await commmand.ExecuteNonQueryAsync();
+
+                await commmand.ExecuteNonQueryAsync().ConfigureAwait(false);
+
                 transaction.Commit();
                 return true;
             }

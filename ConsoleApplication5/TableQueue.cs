@@ -1,4 +1,5 @@
-﻿using System.Data;
+﻿using System;
+using System.Data;
 using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Threading;
@@ -22,7 +23,6 @@ namespace QueueProcessor
             while (!ct.IsCancellationRequested)
             {
                 var stopwatch = Stopwatch.StartNew();
-
                 
                 Envelope envelope = null;
 
@@ -70,8 +70,10 @@ namespace QueueProcessor
                 envelope.PrepareExportCommand(command);
                 var xmlReader = await command.ExecuteXmlReaderAsync().ConfigureAwait(false);
 
+                envelope.MessageId = (Guid) command.Parameters["@MessageId"].Value;
+
                 var endPoint = await EndPoint.Factory(envelope);
-                result = await endPoint.Send(tableName, xmlReader);
+                result = await endPoint.Send(envelope.MessageId, tableName, xmlReader);
 
                 transaction.Commit();
             }
@@ -108,6 +110,7 @@ namespace QueueProcessor
                 {
                     return null;
                 }
+
                 return await Envelope.Read(dataReader).ConfigureAwait(false);
             }
         }

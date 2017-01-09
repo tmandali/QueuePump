@@ -1,20 +1,26 @@
 ﻿ALTER PROCEDURE [dbo].[sp_ImportTest]
+	@MessageId uniqueidentifier,	
 	@From NVARCHAR(900),
 	@Xml xml
-AS
-	INSERT INTO Test_Log (Xml) VALUES (@Xml)
+AS	
+	WAITFOR DELAY '00:00:10';
+	INSERT INTO Test_Log (Id, Xml) VALUES (@MessageId, @Xml)
 GO
 
 ALTER PROCEDURE [dbo].[sp_ExportTest]
-	@To NVARCHAR(900),
+	@MessageId uniqueidentifier out,
+	@To NVARCHAR(900),	
 	@Id int
-AS
-	SELECT * FROM (SELECT @Id Id) Export FOR XML AUTO, TYPE
+AS	
+	-- change messageId
+	set @MessageId = CAST(HASHBYTES('MD5', cast(@Id as varchar) + 'XX') AS UNIQUEIDENTIFIER) 
+	WAITFOR DELAY '00:00:05';
+	SELECT * FROM (SELECT @MessageId MessageId, @Id Id) Export FOR XML AUTO, TYPE
 GO
 
 CREATE TABLE [dbo].[Test_Log]
 (
-	[Id] INT NOT NULL PRIMARY KEY IDENTITY(1,1),
+	[Id] UNIQUEIDENTIFIER NOT NULL,
 	[Xml] XML NOT NULL 	
 )
 
@@ -28,7 +34,7 @@ CREATE TABLE [dbo].[Test]
 DELETE Test
 
 INSERT INTO [dbo].[Test] (Id, ReplyTo, EndPoint) 
-VALUES (1, 'dbo.sp_ExportTest','mssql://localhost/testdb.dbo.sp_ImportTest')
+VALUES (1, 'dbo.sp_ExportTest','mssql://localhost/nservicebus.dbo.sp_ImportTest')
 
 EXEC sp_ExportTest 'xx',111
 
