@@ -14,10 +14,12 @@ namespace QueueProcessor
     class TableQueue : IQueue
     {
         string tableName;
+        public string Name { get; set; }
         SqlConnectionFactory connectionFactory;
 
-        public TableQueue(string tableName, string connection)
+        public TableQueue(string name, string tableName, string connection)
         {
+            this.Name = name;
             this.tableName = tableName;
             this.connectionFactory = SqlConnectionFactory.Default(connection);
         }
@@ -75,7 +77,7 @@ namespace QueueProcessor
                 var xmlReader = await command.ExecuteXmlReaderAsync().ConfigureAwait(false);
                 envelope.MessageId = (Guid) command.Parameters["@MessageId"].Value;
 
-                var xsdPath = Path.GetFullPath($@".\Transformation\{tableName}\schema.xsd");
+                var xsdPath = Path.GetFullPath($@".\{Name}\{tableName}\schema.xsd");
                 if (File.Exists(xsdPath))
                 {
                     var xsdReader = XmlReader.Create(xsdPath);

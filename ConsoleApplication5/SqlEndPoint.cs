@@ -27,8 +27,8 @@ namespace QueueProcessor
         
         public override async Task<bool> Send(Guid messageId, string from, XmlReader reader)
         {
-            var xsltPath = Path.GetFullPath($@".\Transformation\{from}\{adress.Host}\{xsltFile}");
-            var exportFile = Path.GetFullPath($@".\Transformation\{from}\Log\{messageId}.xml");
+            var xsltPath = Path.GetFullPath($@".\{adress.Host}\{from}\{xsltFile}");
+            var exportFile = Path.GetFullPath($@".\{adress.Host}\{from}\Log\{messageId}.xml");
 
             var transformReader = Transform(exportFile, reader, xsltPath);
 

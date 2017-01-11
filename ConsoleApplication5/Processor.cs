@@ -86,7 +86,7 @@ namespace QueueProcessor
                     {
                         var tableName = dataReader.GetFieldValue<string>(0);
                         var connectionString = dataReader.GetFieldValue<string>(1);
-                        yield return new TableQueue(tableName, connectionString);
+                        yield return new TableQueue(hostName, tableName, connectionString);
                     }
                 }
             }
