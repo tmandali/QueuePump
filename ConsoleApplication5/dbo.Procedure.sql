@@ -1,12 +1,11 @@
 ﻿CREATE TABLE [Queue]
 (
 	[Table] SYSNAME NOT NULL,	
-	[ConnectionString] NVARCHAR(900) NOT NULL,
 	CONSTRAINT PK_Queue PRIMARY KEY ([Table])
 )
 
 INSERT INTO [Queue]
-SELECT 'dbo.Test', 'Data Source=.\SQLEXPRESS;Initial Catalog=nservicebus;Integrated Security=True'
+SELECT 'dbo.Test'
 
 
 CREATE TABLE [dbo].[Test_Log]

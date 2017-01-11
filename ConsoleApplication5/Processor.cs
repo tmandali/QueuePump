@@ -80,13 +80,12 @@ namespace QueueProcessor
                 using (var connection = new SqlConnection(ConfigurationManager.ConnectionStrings[i].ConnectionString))
                 {
                     connection.Open();                    
-                    var command = new SqlCommand("SELECT [Table], [ConnectionString] FROM [Queue]", connection);
+                    var command = new SqlCommand("SELECT [Table] FROM [Queue]", connection);
                     var dataReader = command.ExecuteReader();
                     while (dataReader.Read())
                     {
                         var tableName = dataReader.GetFieldValue<string>(0);
-                        var connectionString = dataReader.GetFieldValue<string>(1);
-                        yield return new TableQueue(hostName, tableName, connectionString);
+                        yield return new TableQueue(hostName, tableName, connection.ConnectionString);
                     }
                 }
             }
