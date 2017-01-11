@@ -27,8 +27,10 @@ namespace QueueProcessor
         
         public override async Task<bool> Send(Guid messageId, string from, XmlReader reader)
         {
-            var xsltPath = $@".\transformation\{from}\{adress.Host}\{xsltFile}";
-            var transformReader = Transform(reader, xsltPath);
+            var xsltPath = Path.GetFullPath($@".\Transformation\{from}\{adress.Host}\{xsltFile}");
+            var exportFile = Path.GetFullPath($@".\Transformation\{from}\Log\{messageId}.xml");
+
+            var transformReader = Transform(exportFile, reader, xsltPath);
 
             using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
             using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
@@ -37,7 +39,7 @@ namespace QueueProcessor
                 commmand.CommandType = CommandType.StoredProcedure;
                 commmand.Parameters.AddWithValue("@MessageId", messageId);
                 commmand.Parameters.AddWithValue("@From", from);
-                commmand.Parameters.AddWithValue("@Xml", new SqlXml(reader));
+                commmand.Parameters.AddWithValue("@Xml", new SqlXml(transformReader));
 
                 await commmand.ExecuteNonQueryAsync().ConfigureAwait(false);
 

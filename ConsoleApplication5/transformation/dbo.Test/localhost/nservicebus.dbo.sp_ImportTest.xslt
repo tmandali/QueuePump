@@ -4,9 +4,11 @@
 >
     <xsl:output method="xml" indent="yes"/>
 
-    <xsl:template match="@* | node()">
-        <xsl:copy>
-            <xsl:apply-templates select="@* | node()"/>
-        </xsl:copy>
+    <xsl:template match="Export">
+      <test>
+          <xsl:copy>
+            <xsl:value-of select="@MessageId"/>
+          </xsl:copy>
+      </test>
     </xsl:template>
 </xsl:stylesheet>

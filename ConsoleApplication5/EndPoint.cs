@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using System.Xml;
@@ -28,20 +29,25 @@ namespace QueueProcessor
             return Task.FromResult(result);
         }
 
-        protected XmlReader Transform(XmlReader input, string xsltFile)
+        protected static XmlReader Transform(string exportFile , XmlReader input, string xsltFile)
         {
+            var directory = Path.GetDirectoryName(exportFile);
+            if (!Directory.Exists(directory))
+                Directory.CreateDirectory(directory);
+
+            var outputWriter = XmlWriter.Create(exportFile);
+
             if (File.Exists(xsltFile))
             {
-                var ms = new MemoryStream();
-                var outputWriter = XmlWriter.Create(ms);
-
                 var xslt = new XslCompiledTransform();
                 xslt.Load(xsltFile);
                 xslt.Transform(input, outputWriter);
-                return XmlReader.Create(ms);
             }
 
-            return input;
+            outputWriter.Close();
+            Trace.TraceInformation($"Log file {exportFile}");
+
+            return XmlReader.Create(exportFile);
         }
     }
 }
