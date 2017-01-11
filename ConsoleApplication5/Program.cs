@@ -23,39 +23,12 @@ namespace QueueProcessor
         async static Task AsyncMain(Program prg)
         {
             var prs = new Processor();
-            prs.Init(prg.GetQueueList, 3, 
+            prs.Init(3, 
                 TimeSpan.FromSeconds(5), 
                 ex => Trace.TraceError(ex.InnerException.Message));
             prs.Start();
             Console.ReadLine();
             await prs.Stop();
-        }
-
-        public IEnumerable<IQueue> GetQueueList()
-        {
-            //var local = ConfigurationManager.ConnectionStrings["localhost"].ConnectionString;
-
-            for (int i = 0; i < ConfigurationManager.ConnectionStrings.Count ; i++)
-            {
-                var hostName = ConfigurationManager.ConnectionStrings[i].Name;
-                if (hostName.Split('.')[0] != "QueueHost")
-                    continue;
-                
-                Trace.TraceInformation($"Lissen to {hostName}");
-
-                using (var connection = new SqlConnection(ConfigurationManager.ConnectionStrings[i].ConnectionString))
-                {
-                    connection.Open();
-                    var command = new SqlCommand("SELECT [Table], [ConnectionString] FROM [Queue]", connection);
-                    var dataReader = command.ExecuteReader();
-                    while (dataReader.Read())
-                    {
-                        var tableName = dataReader.GetFieldValue<string>(0);
-                        var connectionString = dataReader.GetFieldValue<string>(1);
-                        yield return new TableQueue(tableName, connectionString);
-                    }
-                }
-            }
-        }
+        }        
     }    
 }

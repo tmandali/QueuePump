@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
+using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,22 +18,20 @@ namespace QueueProcessor
         Action<Exception> ex;
         Action<Processor> iteration;
 
-        Func<IEnumerable<IQueue>> queueList;
+        //Func<IEnumerable<IQueue>> queueList;
 
-        public void Init(Func<IEnumerable<IQueue>> queueList, int maxConcurrency, TimeSpan retryLoop, Action<Exception> ex)
+        public void Init(int maxConcurrency, TimeSpan retryLoop, Action<Exception> ex)
         {
             this.maxConcurrency = maxConcurrency;
-            //this.queueList = queueList.TakeWhile(x => !cts.IsCancellationRequested);
             this.retryLoop = retryLoop;
             this.ex = ex;
-            this.queueList = queueList;
         }
 
         public void Start()
         {
             cts = new CancellationTokenSource();
             iterator = Task.Run(Receive, CancellationToken.None);
-            System.Diagnostics.Trace.TraceInformation("Processor started ...");
+            Trace.TraceInformation("Processor started ...");
         }
 
         public async Task Stop()
@@ -44,14 +45,15 @@ namespace QueueProcessor
                 throw new TimeoutException("Processor cancel timeout !");
 
             cts.Dispose();
-            System.Diagnostics.Trace.TraceInformation("Processor stoped ...");
+            Trace.TraceInformation("Processor stoped ...");
         }
 
         async Task Receive()
         {
             while (!cts.IsCancellationRequested)
             {
-                queueList()
+                GetQueueList()
+                    .TakeWhile(x => !cts.IsCancellationRequested)
                     .AsParallel()
                     .WithCancellation(cts.Token)
                     .WithDegreeOfParallelism(maxConcurrency)
@@ -60,8 +62,33 @@ namespace QueueProcessor
                             ex(x.Exception);
                     }).GetAwaiter().GetResult());
 
-                System.Diagnostics.Trace.TraceInformation($"Wait time {retryLoop}");
+                Trace.TraceInformation($"Wait time {retryLoop}");
                 await Task.Delay(retryLoop, cts.Token);
+            }
+        }
+
+        public IEnumerable<IQueue> GetQueueList()
+        {
+            for (int i = 0; i < ConfigurationManager.ConnectionStrings.Count; i++)
+            {
+                var hostName = ConfigurationManager.ConnectionStrings[i].Name;
+                if (hostName.Split('.')[0] != "QueueHost")
+                    continue;
+
+                Trace.TraceInformation($"Lissen to {hostName}");
+
+                using (var connection = new SqlConnection(ConfigurationManager.ConnectionStrings[i].ConnectionString))
+                {
+                    connection.Open();                    
+                    var command = new SqlCommand("SELECT [Table], [ConnectionString] FROM [Queue]", connection);
+                    var dataReader = command.ExecuteReader();
+                    while (dataReader.Read())
+                    {
+                        var tableName = dataReader.GetFieldValue<string>(0);
+                        var connectionString = dataReader.GetFieldValue<string>(1);
+                        yield return new TableQueue(tableName, connectionString);
+                    }
+                }
             }
         }
     }
