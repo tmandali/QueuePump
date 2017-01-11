@@ -75,7 +75,7 @@ namespace QueueProcessor
                 var xmlReader = await command.ExecuteXmlReaderAsync().ConfigureAwait(false);
                 envelope.MessageId = (Guid) command.Parameters["@MessageId"].Value;
 
-                var xsdPath = string.Format($@".\transformation\{tableName}\schema.xsd");
+                var xsdPath = Path.GetFullPath($@".\Transformation\{tableName}\schema.xsd");
                 if (File.Exists(xsdPath))
                 {
                     var xsdReader = XmlReader.Create(xsdPath);
@@ -86,7 +86,7 @@ namespace QueueProcessor
                     settings.ValidationFlags |= XmlSchemaValidationFlags.ProcessSchemaLocation;
                     settings.ValidationFlags |= XmlSchemaValidationFlags.ReportValidationWarnings;
                     settings.Schemas.Add(xmlSchema);
-                    xmlReader = XmlReader.Create(xmlReader, settings);                                       
+                    xmlReader = XmlReader.Create(xmlReader, settings);
                 }
 
                 var endPoint = await EndPoint.Factory(envelope);
