@@ -43,6 +43,10 @@ namespace QueueProcessor
                 xslt.Load(xsltFile);
                 xslt.Transform(input, outputWriter);
             }
+            else
+            {
+                outputWriter.WriteNode(input, false);
+            }
 
             outputWriter.Close();
             Trace.TraceInformation($"Log file {exportFile}");
