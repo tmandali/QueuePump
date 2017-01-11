@@ -33,18 +33,27 @@ namespace QueueProcessor
 
         public IEnumerable<IQueue> GetQueueList()
         {
-            var local = ConfigurationManager.ConnectionStrings["localhost"].ConnectionString;
-            
-            using (var connection = new SqlConnection(local))
+            //var local = ConfigurationManager.ConnectionStrings["localhost"].ConnectionString;
+
+            for (int i = 0; i < ConfigurationManager.ConnectionStrings.Count ; i++)
             {
-                connection.Open();
-                var command = new SqlCommand("SELECT [Table], [ConnectionString] FROM [Queue]", connection);
-                var dataReader = command.ExecuteReader();
-                while (dataReader.Read())
+                var hostName = ConfigurationManager.ConnectionStrings[i].Name;
+                if (hostName.Split('.')[0] != "QueueHost")
+                    continue;
+                
+                Trace.TraceInformation($"Lissen to {hostName}");
+
+                using (var connection = new SqlConnection(ConfigurationManager.ConnectionStrings[i].ConnectionString))
                 {
-                    var tableName = dataReader.GetFieldValue<string>(0);
-                    var connectionString = dataReader.GetFieldValue<string>(1);
-                    yield return new TableQueue(tableName, connectionString);
+                    connection.Open();
+                    var command = new SqlCommand("SELECT [Table], [ConnectionString] FROM [Queue]", connection);
+                    var dataReader = command.ExecuteReader();
+                    while (dataReader.Read())
+                    {
+                        var tableName = dataReader.GetFieldValue<string>(0);
+                        var connectionString = dataReader.GetFieldValue<string>(1);
+                        yield return new TableQueue(tableName, connectionString);
+                    }
                 }
             }
         }
