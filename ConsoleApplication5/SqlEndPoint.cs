@@ -19,7 +19,7 @@ namespace QueueProcessor
         protected override void Init(Uri adress, string xsltFile = null)
         {
             this.adress = adress;
-            this.xsltFile = xsltFile ?? $"{adress.Segments[1]}.xslt";
+            this.xsltFile = xsltFile ?? $"{adress.Host}.xslt";
             var connection = System.Configuration.ConfigurationManager.ConnectionStrings[adress.Host].ConnectionString;
             sqlConnectionFactory = SqlConnectionFactory.Default(connection);
             procedureName = adress.Segments[1];

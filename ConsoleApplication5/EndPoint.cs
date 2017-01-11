@@ -22,7 +22,7 @@ namespace QueueProcessor
                     result = new SqlEndPoint();
                     break;
                 default:
-                    throw new Exception($"{envelope.EndPoint.Scheme} desteklenmityor !");
+                    throw new Exception($"{envelope.EndPoint.Scheme} not supported !");
             }
 
             result.Init(envelope.EndPoint);
@@ -42,6 +42,7 @@ namespace QueueProcessor
                 var xslt = new XslCompiledTransform();
                 xslt.Load(xsltFile);
                 xslt.Transform(input, outputWriter);
+                Trace.TraceInformation($"Xslt Transform {xsltFile}");
             }
             else
             {

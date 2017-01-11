@@ -89,6 +89,8 @@ namespace QueueProcessor
                     settings.ValidationFlags |= XmlSchemaValidationFlags.ReportValidationWarnings;
                     settings.Schemas.Add(xmlSchema);
                     xmlReader = XmlReader.Create(xmlReader, settings);
+                    Trace.TraceInformation($"Schema Validation {xsdPath}");
+
                 }
 
                 var endPoint = await EndPoint.Factory(envelope);

@@ -59,7 +59,7 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
-    <Content Include="QueueHost.Local\dbo.Test\nservicebus.dbo.sp_ImportTest.xslt">
+    <Content Include="QueueHost.Local\dbo.Test\queuehost.local.xslt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="QueueHost.Local\dbo.Test\schema.xsd">
