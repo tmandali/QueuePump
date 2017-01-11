@@ -6,7 +6,7 @@
 )
 
 INSERT INTO [Queue]
-SELECT 'dbo.Test', 'Data Source=.;Initial Catalog=nservicebus;Integrated Security=True'
+SELECT 'dbo.Test', 'Data Source=.\SQLEXPRESS;Initial Catalog=nservicebus;Integrated Security=True'
 
 
 CREATE TABLE [dbo].[Test_Log]
@@ -49,7 +49,7 @@ GO
 DELETE Test
 
 INSERT INTO [dbo].[Test] (Id, ReplyTo, EndPoint) 
-VALUES (1, 'dbo.sp_ExportTest','mssql://localhost/nservicebus.dbo.sp_ImportTest')
+VALUES (1, 'dbo.sp_ExportTest','mssql://QueueHost.Local/nservicebus.dbo.sp_ImportTest')
 
 EXEC sp_ExportTest @To='xx',@Id=111
 
