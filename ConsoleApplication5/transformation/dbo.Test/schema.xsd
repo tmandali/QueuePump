@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xsd:schema xmlns:schema="http://www.lcwaikiki.com/queue" 
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+            xmlns:sqltypes="http://schemas.microsoft.com/sqlserver/2004/sqltypes" 
+            elementFormDefault="qualified">
+  <xsd:import namespace="http://schemas.microsoft.com/sqlserver/2004/sqltypes" schemaLocation="http://schemas.microsoft.com/sqlserver/2004/sqltypes/sqltypes.xsd" />
+  <xsd:element name="Export">
+    <xsd:complexType>
+      <xsd:attribute name="MessageId" type="sqltypes:uniqueidentifier" />
+      <xsd:attribute name="Idx" type="sqltypes:int" />
+    </xsd:complexType>
+  </xsd:element>
+</xsd:schema>

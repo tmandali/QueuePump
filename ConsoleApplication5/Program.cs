@@ -4,8 +4,10 @@ using System.Configuration;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
 using System.Linq;
-using Dapper;
 using System.Xml;
+using System.Xml.Schema;
+using System.Diagnostics;
+using System.IO;
 
 namespace QueueProcessor
 {
@@ -23,7 +25,7 @@ namespace QueueProcessor
             var prs = new Processor();
             prs.Init(prg.GetQueueList, 3, 
                 TimeSpan.FromSeconds(5), 
-                ex => System.Diagnostics.Trace.TraceError(ex.InnerException.Message));
+                ex => Trace.TraceError(ex.InnerException.Message));
             prs.Start();
             Console.ReadLine();
             await prs.Stop();
@@ -31,22 +33,20 @@ namespace QueueProcessor
 
         public IEnumerable<IQueue> GetQueueList()
         {
-            var connectionString = ConfigurationManager.ConnectionStrings["localhost"].ConnectionString;
+            var local = ConfigurationManager.ConnectionStrings["localhost"].ConnectionString;
             
-            using (var connection = new SqlConnection(connectionString))
+            using (var connection = new SqlConnection(local))
             {
                 connection.Open();
-                var command = new SqlCommand("SELECT [Table], [ConnectionString], [Schema] FROM [Queue]", connection);
+                var command = new SqlCommand("SELECT [Table], [ConnectionString] FROM [Queue]", connection);
                 var dataReader = command.ExecuteReader();
                 while (dataReader.Read())
                 {
-                    XmlReader schema = null;
-                    if (!dataReader.GetSqlXml(2).IsNull)
-                        schema = dataReader.GetSqlXml(2).CreateReader();
-
-                    yield return new TableQueue(dataReader.GetFieldValue<string>(0), dataReader.GetFieldValue<string>(1), schema);
+                    var tableName = dataReader.GetFieldValue<string>(0);
+                    var connectionString = dataReader.GetFieldValue<string>(1);
+                    yield return new TableQueue(tableName, connectionString);
                 }
             }
-        }        
+        }
     }    
 }
