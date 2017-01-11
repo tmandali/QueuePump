@@ -2,8 +2,10 @@
 using System.Data;
 using System.Data.SqlClient;
 using System.Data.SqlTypes;
+using System.IO;
 using System.Threading.Tasks;
 using System.Xml;
+using System.Xml.Xsl;
 
 namespace QueueProcessor
 {
@@ -11,18 +13,23 @@ namespace QueueProcessor
     {
         private SqlConnectionFactory sqlConnectionFactory;
         private string procedureName;
-        private string endPoint;
-
-        protected override void Init(Uri adress)
+        private Uri adress;
+        private string xsltFile;
+        
+        protected override void Init(Uri adress, string xsltFile = null)
         {
-            endPoint = adress.ToString();
+            this.adress = adress;
+            this.xsltFile = xsltFile ?? $"{adress.Segments[1]}.xslt";
             var connection = System.Configuration.ConfigurationManager.ConnectionStrings[adress.Host].ConnectionString;
             sqlConnectionFactory = SqlConnectionFactory.Default(connection);
             procedureName = adress.Segments[1];
         }
-
+        
         public override async Task<bool> Send(Guid messageId, string from, XmlReader reader)
         {
+            var xsltPath = $@".\transformation\{from}\{adress.Host}\{xsltFile}";
+            var transformReader = Transform(reader, xsltPath);
+
             using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
             using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
             {

@@ -5,27 +5,9 @@
 	CONSTRAINT PK_Queue PRIMARY KEY ([Table])
 )
 
-CREATE TABLE [Transform]
-(
-	[Table] SYSNAME NOT NULL,	
-	[EndPoint] SYSNAME NOT NULL,
-	[Transform] XML NOT NULL,
-	CONSTRAINT PK_QueueTransform PRIMARY KEY ([Table], [EndPoint])
-)
-
-
 INSERT INTO [Queue]
-SELECT 'dbo.Test', 'Data Source=.;Initial Catalog=nservicebus;Integrated Security=True',
-'<xsd:schema xmlns:schema="http://www.lcwaikiki.com/queue" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:sqltypes="http://schemas.microsoft.com/sqlserver/2004/sqltypes" elementFormDefault="qualified">
-  <xsd:import namespace="http://schemas.microsoft.com/sqlserver/2004/sqltypes" schemaLocation="http://schemas.microsoft.com/sqlserver/2004/sqltypes/sqltypes.xsd" />
-  <xsd:element name="Export">
-    <xsd:complexType>
-      <xsd:attribute name="MessageId" type="sqltypes:uniqueidentifier" />
-      <xsd:attribute name="Id" type="sqltypes:int" />
-    </xsd:complexType>
-  </xsd:element>
-</xsd:schema>'
-GO
+SELECT 'dbo.Test', 'Data Source=.;Initial Catalog=nservicebus;Integrated Security=True'
+
 
 CREATE TABLE [dbo].[Test_Log]
 (

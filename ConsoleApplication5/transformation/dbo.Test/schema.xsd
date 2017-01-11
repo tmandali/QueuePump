@@ -7,7 +7,7 @@
   <xsd:element name="Export">
     <xsd:complexType>
       <xsd:attribute name="MessageId" type="sqltypes:uniqueidentifier" />
-      <xsd:attribute name="Idx" type="sqltypes:int" />
+      <xsd:attribute name="Id" type="sqltypes:int" />
     </xsd:complexType>
   </xsd:element>
 </xsd:schema>
