@@ -80,17 +80,16 @@ namespace QueueProcessor
                 var xsdPath = Path.GetFullPath($@".\{Name}\{tableName}\schema.xsd");
                 if (File.Exists(xsdPath))
                 {
-                    var xsdReader = XmlReader.Create(xsdPath);
-                    var xmlSchema = XmlSchema.Read(xsdReader, new ValidationEventHandler(XmlSchemaValidation));
-                    var settings = new XmlReaderSettings();                    
+                    var settings = new XmlReaderSettings();
+                    settings.Schemas.Add(null, xsdPath);
                     settings.ConformanceLevel = ConformanceLevel.Auto;
                     settings.ValidationType = ValidationType.Schema;
                     settings.ValidationFlags |= XmlSchemaValidationFlags.ProcessSchemaLocation;
                     settings.ValidationFlags |= XmlSchemaValidationFlags.ReportValidationWarnings;
-                    settings.Schemas.Add(xmlSchema);
+                    settings.ValidationEventHandler += Settings_ValidationEventHandler;
+
                     xmlReader = XmlReader.Create(xmlReader, settings);
                     Trace.TraceInformation($"Schema Validation {xsdPath}");
-
                 }
 
                 var endPoint = await EndPoint.Factory(envelope);
@@ -102,13 +101,13 @@ namespace QueueProcessor
             return result;
         }
 
-        private void XmlSchemaValidation(object sender, ValidationEventArgs e)
+        private void Settings_ValidationEventHandler(object sender, ValidationEventArgs e)
         {
-            if (e.Severity == XmlSeverityType.Warning)
+             if (e.Severity == XmlSeverityType.Warning)
                 Trace.TraceWarning(e.Message);
             else
                 throw new XmlSchemaValidationException(e.Message, e.Exception);
-        }
+        }        
 
         async Task<Envelope> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationToken ct)
         {
