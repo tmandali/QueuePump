@@ -1,11 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Data.SqlTypes;
 using System.IO;
 using System.Threading.Tasks;
 using System.Xml;
-using System.Xml.Xsl;
+using System.Linq;
 
 namespace QueueProcessor
 {
@@ -15,13 +17,22 @@ namespace QueueProcessor
         private string procedureName;
         private Uri adress;
         private string xsltFile;
-        
+        private ConnectionStringSettings connectionStringSettings;
+
         protected override void Init(Uri adress, string xsltFile = null)
         {
             this.adress = adress;
             this.xsltFile = xsltFile ?? $"{adress.Host}.xslt";
-            var connection = System.Configuration.ConfigurationManager.ConnectionStrings[adress.Host].ConnectionString;
-            sqlConnectionFactory = SqlConnectionFactory.Default(connection);
+
+            var cnnStringList = new List<ConnectionStringSettings>();
+            foreach (ConnectionStringSettings item in ConfigurationManager.ConnectionStrings)
+                cnnStringList.Add(item);
+
+            connectionStringSettings = cnnStringList.Where(c => c.Name.Equals(adress.Host, StringComparison.CurrentCultureIgnoreCase)).SingleOrDefault();
+            if (connectionStringSettings == null)
+                throw new Exception($"Connection {adress.Host} not found !");
+
+            sqlConnectionFactory = SqlConnectionFactory.Default(connectionStringSettings.ConnectionString);           
             procedureName = adress.Segments[1];
         }
         
@@ -32,7 +43,7 @@ namespace QueueProcessor
 
             var transformReader = Transform(exportFile, reader, xsltPath);
 
-            using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
+            using (var connection = await sqlConnectionFactory .OpenNewConnection().ConfigureAwait(false))
             using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
             {
                 var commmand = new SqlCommand(procedureName, connection, transaction);

@@ -15,10 +15,7 @@ namespace QueueProcessor
         CancellationTokenSource cts;
         int maxConcurrency = 0;
         TimeSpan retryLoop;
-        Action<Exception> ex;
-        Action<Processor> iteration;
-
-        //Func<IEnumerable<IQueue>> queueList;
+        Action<Exception> ex;        
 
         public void Init(int maxConcurrency, TimeSpan retryLoop, Action<Exception> ex)
         {
@@ -53,7 +50,7 @@ namespace QueueProcessor
             while (!cts.IsCancellationRequested)
             {
                 GetQueueList()
-                    .TakeWhile(x => !cts.IsCancellationRequested)
+                    .ToList()
                     .AsParallel()
                     .WithCancellation(cts.Token)
                     .WithDegreeOfParallelism(maxConcurrency)
@@ -69,23 +66,27 @@ namespace QueueProcessor
 
         public IEnumerable<IQueue> GetQueueList()
         {
-            for (int i = 0; i < ConfigurationManager.ConnectionStrings.Count; i++)
+            foreach (ConnectionStringSettings connectionSetting in ConfigurationManager.ConnectionStrings)
             {
-                var hostName = ConfigurationManager.ConnectionStrings[i].Name;
-                if (hostName.Split('.')[0] != "QueueHost")
+                if (connectionSetting.Name.Split('.')[0] != "QueueHost")
                     continue;
 
-                Trace.TraceInformation($"Lissen to {hostName}");
+                Trace.TraceInformation($"Lissen to {connectionSetting.Name}");
 
-                using (var connection = new SqlConnection(ConfigurationManager.ConnectionStrings[i].ConnectionString))
+                using (var connection = new SqlConnection(connectionSetting.ConnectionString))
                 {
                     connection.Open();                    
-                    var command = new SqlCommand("SELECT [Table] FROM [Queue]", connection);
+                    var command = new SqlCommand("SELECT [Table], [MaxConcurrency] FROM [Queue]", connection);
                     var dataReader = command.ExecuteReader();
                     while (dataReader.Read())
                     {
                         var tableName = dataReader.GetFieldValue<string>(0);
-                        yield return new TableQueue(hostName, tableName, connection.ConnectionString);
+                        var maxConcurrency = dataReader.GetFieldValue<int>(1);
+
+                        for (int m = 0; m < maxConcurrency; m++)
+                        {
+                            yield return new TableQueue(connectionSetting.Name, tableName, connection.ConnectionString);
+                        }                        
                     }
                 }
             }

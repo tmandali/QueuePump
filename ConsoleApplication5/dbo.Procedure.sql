@@ -1,11 +1,12 @@
 ﻿CREATE TABLE [Queue]
 (
 	[Table] SYSNAME NOT NULL,	
+	[MaxConcurrency] INT NOT NULL,
 	CONSTRAINT PK_Queue PRIMARY KEY ([Table])
 )
 
 INSERT INTO [Queue]
-SELECT 'dbo.Test'
+SELECT 'dbo.Test', 3
 
 
 CREATE TABLE [dbo].[Test_Log]
