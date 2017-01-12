@@ -40,7 +40,6 @@ namespace QueueProcessor
         {
             var xsltPath = Path.GetFullPath($@".\{adress.Host}\{from}\{xsltFile}");
             var exportFile = Path.GetFullPath($@".\{adress.Host}\{from}\Log\{messageId}.xml");
-
             var transformReader = Transform(exportFile, reader, xsltPath);
 
             using (var connection = await sqlConnectionFactory .OpenNewConnection().ConfigureAwait(false))
@@ -55,8 +54,10 @@ namespace QueueProcessor
                 await commmand.ExecuteNonQueryAsync().ConfigureAwait(false);
 
                 transaction.Commit();
-                return true;
             }
+
+            transformReader.Close();
+            return true;
         }
     }
 }

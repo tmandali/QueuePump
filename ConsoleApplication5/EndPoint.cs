@@ -35,24 +35,23 @@ namespace QueueProcessor
             if (!Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
 
-            var outputWriter = XmlWriter.Create(exportFile);
-
-            if (File.Exists(xsltFile))
+            using (var outputWriter = XmlWriter.Create(exportFile))
             {
-                var xslt = new XslCompiledTransform();
-                xslt.Load(xsltFile);
-                xslt.Transform(input, outputWriter);
-                Trace.TraceInformation($"Xslt Transform {xsltFile}");
+                if (File.Exists(xsltFile))
+                {
+                    var xslt = new XslCompiledTransform();
+                    xslt.Load(xsltFile);
+                    xslt.Transform(input, outputWriter);
+                    Trace.TraceInformation($"Xslt Transform {xsltFile}");
+                }
+                else
+                {
+                    outputWriter.WriteNode(input, false);
+                }
+                outputWriter.Close();
+                Trace.TraceInformation($"Log file {exportFile}");
+                return XmlReader.Create(exportFile);
             }
-            else
-            {
-                outputWriter.WriteNode(input, false);
-            }
-
-            outputWriter.Close();
-            Trace.TraceInformation($"Log file {exportFile}");
-
-            return XmlReader.Create(exportFile);
         }
     }
 }

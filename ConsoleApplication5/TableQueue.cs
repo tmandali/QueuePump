@@ -86,6 +86,7 @@ namespace QueueProcessor
                     settings.ValidationType = ValidationType.Schema;
                     settings.ValidationFlags |= XmlSchemaValidationFlags.ProcessSchemaLocation;
                     settings.ValidationFlags |= XmlSchemaValidationFlags.ReportValidationWarnings;
+                    settings.ValidationFlags |= XmlSchemaValidationFlags.ProcessIdentityConstraints;
                     settings.ValidationEventHandler += Settings_ValidationEventHandler;
 
                     xmlReader = XmlReader.Create(xmlReader, settings);
@@ -97,7 +98,6 @@ namespace QueueProcessor
 
                 transaction.Commit();
             }
-
             return result;
         }
 
