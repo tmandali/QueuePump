@@ -15,13 +15,15 @@ namespace QueueProcessor
         CancellationTokenSource cts;
         int maxConcurrency = 0;
         TimeSpan retryLoop;
-        Action<Exception> ex;        
+        Action<Exception> ex;
+        SemaphoreSlim concurrencyLimiter;
 
         public void Init(int maxConcurrency, TimeSpan retryLoop, Action<Exception> ex)
         {
             this.maxConcurrency = maxConcurrency;
             this.retryLoop = retryLoop;
             this.ex = ex;
+            this.concurrencyLimiter = new SemaphoreSlim(maxConcurrency);
         }
 
         public void Start()
@@ -41,54 +43,60 @@ namespace QueueProcessor
             if (finishedTask == timeoutTask)
                 throw new TimeoutException("Processor cancel timeout !");
 
+            concurrencyLimiter.Dispose();
             cts.Dispose();
             Trace.TraceInformation("Processor stoped ...");
+        }
+
+        static void Ignore(Task task)
+        {
+
         }
 
         async Task Receive()
         {
             while (!cts.IsCancellationRequested)
             {
-                GetQueueList()
-                    .ToList()
-                    .AsParallel()
-                    .WithCancellation(cts.Token)
-                    .WithDegreeOfParallelism(maxConcurrency)
-                    .ForAll(q => q.Receive(cts.Token).ContinueWith(x => {
-                        if (x.IsFaulted)
-                            ex(x.Exception);
-                    }).GetAwaiter().GetResult());
+                var tasklist = new System.Collections.Concurrent.ConcurrentBag<Task>();
 
-                Trace.TraceInformation($"Wait time {retryLoop}");
-                await Task.Delay(retryLoop, cts.Token);
-            }
-        }
-
-        public IEnumerable<IQueue> GetQueueList()
-        {
-            foreach (ConnectionStringSettings connectionSetting in ConfigurationManager.ConnectionStrings)
-            {
-                if (connectionSetting.Name.Split('.')[0] != "QueueHost")
-                    continue;
-
-                Trace.TraceInformation($"Lissen to {connectionSetting.Name}");
-
-                using (var connection = new SqlConnection(connectionSetting.ConnectionString))
+                foreach (ConnectionStringSettings connectionSetting in ConfigurationManager.ConnectionStrings)
                 {
-                    connection.Open();                    
-                    var command = new SqlCommand("SELECT [Table], [MaxConcurrency] FROM [Queue]", connection);
-                    var dataReader = command.ExecuteReader();
-                    while (dataReader.Read())
-                    {
-                        var tableName = dataReader.GetFieldValue<string>(0);
-                        var maxConcurrency = dataReader.GetFieldValue<int>(1);
+                    if (connectionSetting.Name.Split('.')[0] != "QueueHost")
+                        continue;
 
-                        for (int m = 0; m < maxConcurrency; m++)
+                    //Trace.TraceInformation($"Lissen to {connectionSetting.Name}");
+
+                    using (var connection = await SqlConnectionFactory.Default(connectionSetting.ConnectionString).OpenNewConnection().ConfigureAwait(false))
+                    {
+                        var command = new SqlCommand("SELECT [Table], [MaxConcurrency] FROM [Queue]", connection);
+                        var dataReader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+                        while (await dataReader.ReadAsync().ConfigureAwait(false))
                         {
-                            yield return new TableQueue(connectionSetting.Name, tableName, connection.ConnectionString);
-                        }                        
+                            var tableName = await dataReader.GetFieldValueAsync<string>(0).ConfigureAwait(false);
+                            var maxConcurrency = await dataReader.GetFieldValueAsync<int>(1).ConfigureAwait(false);
+                            var instance = new TableQueue(
+                                connectionSetting.Name,
+                                tableName,
+                                connection.ConnectionString);
+
+                            for (int i = 0; i < maxConcurrency; i++)
+                            {
+                                var task = instance.Receive(i, cts.Token);
+                                tasklist.Add(task);
+                            }
+                        }
                     }
                 }
+
+                Task runner;
+                while (tasklist.TryTake(out runner))
+                {
+                    await concurrencyLimiter.WaitAsync(cts.Token).ConfigureAwait(false);
+                    await runner.ContinueWith(c => concurrencyLimiter.Release(), cts.Token).ConfigureAwait(false);
+                }
+
+                Trace.TraceInformation($"Wait time {retryLoop}");
+                await Task.Delay(retryLoop, cts.Token).ConfigureAwait(false);
             }
         }
     }

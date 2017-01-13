@@ -5,7 +5,8 @@ namespace QueueProcessor
 {
     internal interface IQueue
     {
-        string Name { get; set; }
-        Task Receive(CancellationToken ct);
+        string Name { get; }
+
+        Task Receive(int i, CancellationToken ct);
     }
 }

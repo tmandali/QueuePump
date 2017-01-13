@@ -24,7 +24,7 @@ namespace QueueProcessor
         {
             var prs = new Processor();
             prs.Init(3, 
-                TimeSpan.FromSeconds(5), 
+                TimeSpan.FromSeconds(10), 
                 ex => Trace.TraceError(ex.InnerException.Message));
             prs.Start();
             Console.ReadLine();

@@ -14,7 +14,9 @@ namespace QueueProcessor
     class TableQueue : IQueue
     {
         string tableName;
-        public string Name { get; set; }
+
+        public string Name { get; }
+
         SqlConnectionFactory connectionFactory;
 
         public TableQueue(string name, string tableName, string connection)
@@ -24,8 +26,12 @@ namespace QueueProcessor
             this.connectionFactory = SqlConnectionFactory.Default(connection);
         }
 
-        public async Task Receive(CancellationToken ct)
+        public async Task Receive(int i, CancellationToken ct)
         {
+
+            if (i==1)
+                await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
             while (!ct.IsCancellationRequested)
             {
                 var stopwatch = Stopwatch.StartNew();
@@ -41,7 +47,7 @@ namespace QueueProcessor
                   
                     if (envelope == null)
                     {
-                        Trace.TraceInformation($"Not received message {stopwatch.Elapsed}");
+                        Trace.TraceInformation($"{Name}:{i} not received message {stopwatch.Elapsed}");
                         transaction.Commit();
                         return;
                     }
@@ -138,7 +144,6 @@ namespace QueueProcessor
                 {
                     return null;
                 }
-
                 return await Envelope.Read(dataReader).ConfigureAwait(false);
             }
         }
