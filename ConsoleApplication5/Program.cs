@@ -18,7 +18,6 @@ namespace QueueProcessor
         IList<ConnectionStringSettings> hostlist;
         CancellationTokenSource cancellationTokenSource;
         Task[] tasks;
-        Task startTask;
 
         static void Main(string[] args)
         {
@@ -28,7 +27,7 @@ namespace QueueProcessor
 
         async static Task AsyncMain(Program prg)
         {
-            prg.Init().Start();            
+            prg.Init().Start(TimeSpan.FromSeconds(10));            
             Console.ReadLine();            
             await prg.Stop();
 
@@ -47,11 +46,11 @@ namespace QueueProcessor
             return this;
         }
    
-        void Start()
+        void Start(TimeSpan retry)
         {
             tasks = (
                 from host in hostlist
-                select new HostConnect(host).Starter(TimeSpan.FromSeconds(10), cancellationTokenSource.Token)
+                select new HostConnect(host).Starter(retry, cancellationTokenSource.Token)
             ).ToArray();
                         
             Trace.TraceInformation("Service started");
@@ -60,7 +59,12 @@ namespace QueueProcessor
         async Task Stop()
         {
             cancellationTokenSource.Cancel();
-            await Task.WhenAll(tasks);
+            var timeout = Task.Delay(TimeSpan.FromSeconds(30));
+            var finaly = await Task.WhenAny(timeout, Task.WhenAll(tasks)).ConfigureAwait(false);
+
+            if (finaly == timeout)
+                Trace.TraceWarning("Service process timeout");
+
             cancellationTokenSource.Dispose();
         }
 

@@ -30,12 +30,10 @@ namespace QueueProcessor
                 {
                     concurrencyLimiter = new SemaphoreSlim(2);
                     runningReceiveTasks = new ConcurrentDictionary<Task, Task>();
-
                     sqlConnectionFactory = SqlConnectionFactory.Default(host.ConnectionString);
 
                     await Processor(cancellationToken).ConfigureAwait(false);
-                    await Task.WhenAll(runningReceiveTasks.Values);
-
+                    await Task.WhenAll(runningReceiveTasks.Values).ConfigureAwait(false);
 
                     Trace.TraceInformation($"{host.Name} wait {retry}");
                     await Task.Delay(retry, cancellationToken).ConfigureAwait(false);
@@ -51,7 +49,7 @@ namespace QueueProcessor
                 catch (SqlException e) when (e.ErrorCode == - 2146232060)
                 {
                     //Trace.TraceError($"Sql connection failed, retry {retry}");
-                    await Task.Delay(retry);
+                    await Task.Delay(retry, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
