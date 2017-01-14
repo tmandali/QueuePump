@@ -50,7 +50,6 @@
     <Compile Include="EndPoint.cs" />
     <Compile Include="SqlEndPoint.cs" />
     <Compile Include="Envelope.cs" />
-    <Compile Include="Processor.cs" />
     <Compile Include="IQueue.cs" />
     <Compile Include="TableQueue.cs" />
     <Compile Include="SqlConnectionFactory.cs" />
