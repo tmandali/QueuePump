@@ -7,6 +7,6 @@ namespace QueueProcessor
     {
         string Name { get; }
 
-        Task Receive(int i, CancellationToken ct);
+        Task Receive(CancellationToken ct);
     }
 }

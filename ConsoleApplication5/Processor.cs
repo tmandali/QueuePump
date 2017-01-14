@@ -81,7 +81,7 @@ namespace QueueProcessor
 
                             for (int i = 0; i < maxConcurrency; i++)
                             {
-                                var task = instance.Receive(i, cts.Token);
+                                var task = instance.Receive(cts.Token);
                                 tasklist.Add(task);
                             }
                         }

@@ -26,12 +26,10 @@ namespace QueueProcessor
             this.connectionFactory = SqlConnectionFactory.Default(connection);
         }
 
-        public async Task Receive(int i, CancellationToken ct)
+        public async Task Receive(CancellationToken ct)
         {
-
-            if (i==1)
-                await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
-
+            await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+                        
             while (!ct.IsCancellationRequested)
             {
                 var stopwatch = Stopwatch.StartNew();
@@ -47,9 +45,9 @@ namespace QueueProcessor
                   
                     if (envelope == null)
                     {
-                        Trace.TraceInformation($"{Name}:{i} not received message {stopwatch.Elapsed}");
+                        Trace.TraceInformation($"{Name}:{tableName} not received message {stopwatch.Elapsed}");
                         transaction.Commit();
-                        return;
+                        break;
                     }
 
                     Trace.TraceInformation($"Received message {stopwatch.Elapsed}");
