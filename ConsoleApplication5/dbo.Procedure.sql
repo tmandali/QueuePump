@@ -6,7 +6,7 @@
 )
 
 INSERT INTO [Queue]
-SELECT 'dbo.Test', 3
+SELECT 'dbo.Test4', 1
 
 
 CREATE TABLE [dbo].[Test_Log]
@@ -17,7 +17,7 @@ CREATE TABLE [dbo].[Test_Log]
 
 GO
 
-CREATE TABLE [dbo].[Test]
+CREATE TABLE [dbo].[Test4]
 (
 	[Id] INT NOT NULL PRIMARY KEY, 
     [ReplyTo] SYSNAME NOT NULL, 
