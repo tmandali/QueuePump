@@ -61,8 +61,7 @@ namespace QueueProcessor
         async Task Processor(CancellationToken cancellationToken)
         {
             using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
-            {
-                
+            {                
                 var command = new SqlCommand("SELECT [Table], [MaxConcurrency] FROM [Queue]", connection);
                 var dataReader = await command.ExecuteReaderAsync().ConfigureAwait(false);
                 while (await TryReadQueue(dataReader, cancellationToken).ConfigureAwait(false) && !cancellationToken.IsCancellationRequested) {                    
@@ -77,12 +76,12 @@ namespace QueueProcessor
             if (!await dataReader.ReadAsync().ConfigureAwait(false))
                 return false;
 
-            dynamic queueDefination = new ExpandoObject();
-            queueDefination.TableName = await dataReader.GetFieldValueAsync<string>(0).ConfigureAwait(false);
+            var tableName = await dataReader.GetFieldValueAsync<string>(0).ConfigureAwait(false);
             var maxConcurrency = await dataReader.GetFieldValueAsync<int>(1).ConfigureAwait(false);
-            var queue = new TableQueue(host.Name, queueDefination.TableName, host.ConnectionString).Receive(cancellationToken).ContinueWith(c=> concurrencyLimiter.Release()).ConfigureAwait(false);
 
+            var queue = new TableQueue(host.Name, tableName, host.ConnectionString).Receive(cancellationToken).ContinueWith(c=> concurrencyLimiter.Release()).ConfigureAwait(false);
             return true;
         }
+
     }
 }

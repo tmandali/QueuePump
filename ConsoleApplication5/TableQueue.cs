@@ -28,12 +28,12 @@ namespace QueueProcessor
 
         public async Task Receive(CancellationToken ct)
         {
+            Trace.TraceInformation($"{Name}:{tableName} started");
             await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
-                        
+            
             while (!ct.IsCancellationRequested)
             {
-                var stopwatch = Stopwatch.StartNew();
-                
+                var stopwatch = Stopwatch.StartNew();                
                 Envelope envelope = null;
 
                 using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
@@ -45,28 +45,28 @@ namespace QueueProcessor
                   
                     if (envelope == null)
                     {
-                        Trace.TraceInformation($"{Name}:{tableName} not received message {stopwatch.Elapsed}");
+                        Trace.TraceInformation($"{Name}:{tableName} Not received message");
                         transaction.Commit();
-                        break;
+                        return;
                     }
 
-                    Trace.TraceInformation($"Received message {stopwatch.Elapsed}");
+                    Trace.TraceInformation($"{Name}:{tableName} Received message");
 
                     stopwatch.Start();
 
                     if (await TryProcess(envelope).ConfigureAwait(false))
                     {
                         stopwatch.Stop();
-                        Trace.TraceInformation($"Processed message {stopwatch.Elapsed}");
+                        Trace.TraceInformation($"{Name}:{tableName} Processed message");
                         transaction.Commit();
                     }
                     else
                     {
-                        Trace.TraceInformation($"Rollback message");
+                        Trace.TraceInformation($"{Name}:{tableName} Rollback message");
                         transaction.Rollback();
                     }
                 }
-            }
+            }            
         }
 
         async Task<bool> TryProcess(Envelope envelope)
