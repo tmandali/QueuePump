@@ -33,11 +33,12 @@ namespace QueueProcessor
 
                     sqlConnectionFactory = SqlConnectionFactory.Default(host.ConnectionString);
 
-                    await Processor(cancellationToken).ConfigureAwait(false);                    
-                    await Task.Delay(retry, cancellationToken).ConfigureAwait(false);
+                    await Processor(cancellationToken).ConfigureAwait(false);
+                    await Task.WhenAll(runningReceiveTasks.Values);
+
 
                     Trace.TraceInformation($"{host.Name} wait {retry}");
-                    await Task.WhenAll(runningReceiveTasks.Values);
+                    await Task.Delay(retry, cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -93,7 +94,6 @@ namespace QueueProcessor
                 var receiveTasks = (ConcurrentDictionary<Task, Task>) state;
                 Task toBeRemoved;
                 receiveTasks.TryRemove(t, out toBeRemoved);
-
             }, runningReceiveTasks, TaskContinuationOptions.ExecuteSynchronously);
             
             return true;
