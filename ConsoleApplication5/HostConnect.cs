@@ -22,13 +22,13 @@ namespace QueueProcessor
             this.host = host;
         }
 
-        public async Task Starter(TimeSpan retry, CancellationToken cancellationToken)
+        public async Task Starter(int maxConcurrency, TimeSpan retry, CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    concurrencyLimiter = new SemaphoreSlim(2);
+                    concurrencyLimiter = new SemaphoreSlim(maxConcurrency);
                     runningReceiveTasks = new ConcurrentDictionary<Task, Task>();
                     sqlConnectionFactory = SqlConnectionFactory.Default(host.ConnectionString);
 

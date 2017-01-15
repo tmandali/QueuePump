@@ -46,7 +46,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="HostConnect.cs" />
-    <Compile Include="ParallelTaskRunnerExtension.cs" />
     <Compile Include="EndPoint.cs" />
     <Compile Include="SqlEndPoint.cs" />
     <Compile Include="Envelope.cs" />

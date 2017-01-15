@@ -27,16 +27,9 @@ namespace QueueProcessor
 
         async static Task AsyncMain(Program prg)
         {
-            prg.Init().Start(TimeSpan.FromSeconds(10));            
+            prg.Init().Start(4, TimeSpan.FromSeconds(10));            
             Console.ReadLine();            
             await prg.Stop();
-
-            //var prs = new Processor();
-            //prs.Init(3,
-            //    TimeSpan.FromSeconds(10),
-            //    ex => Trace.TraceError(ex.InnerException.Message));
-            //prs.Start();
-            //Console.ReadLine();            
         }
 
         Program Init()
@@ -46,11 +39,11 @@ namespace QueueProcessor
             return this;
         }
    
-        void Start(TimeSpan retry)
+        void Start(int maxConcurrency, TimeSpan retry)
         {
             tasks = (
                 from host in hostlist
-                select new HostConnect(host).Starter(retry, cancellationTokenSource.Token)
+                select new HostConnect(host).Starter(maxConcurrency, retry, cancellationTokenSource.Token)
             ).ToArray();
                         
             Trace.TraceInformation("Service started");
