@@ -3,8 +3,6 @@ using System.Collections.Concurrent;
 using System.Configuration;
 using System.Data.SqlClient;
 using System.Diagnostics;
-using System.Dynamic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -66,7 +64,7 @@ namespace QueueProcessor
         {
             using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
             {                
-                var command = new SqlCommand("SELECT [Table], [MaxConcurrency] FROM [Queue]", connection);
+                var command = new SqlCommand("SELECT [Table] FROM [Queue]", connection);
                 var dataReader = await command.ExecuteReaderAsync().ConfigureAwait(false);
                 while (await TryReadQueue(dataReader, cancellationToken).ConfigureAwait(false) && !cancellationToken.IsCancellationRequested) {};                
             }
@@ -82,7 +80,6 @@ namespace QueueProcessor
                 return false;
 
             var tableName = await dataReader.GetFieldValueAsync<string>(0).ConfigureAwait(false);
-            var maxConcurrency = await dataReader.GetFieldValueAsync<int>(1).ConfigureAwait(false);
 
             var receive = Receiver(tableName, cancellationToken);
             runningReceiveTasks.TryAdd(receive, receive);

@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Schema;
-using System.Xml.Xsl;
 
 namespace QueueProcessor
 {
