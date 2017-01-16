@@ -70,8 +70,6 @@ namespace QueueProcessor
             }
         }
 
-        ConcurrentBag<TableQueue> cb = new ConcurrentBag<TableQueue>();
-
         async Task<bool> TryReadQueue(SqlDataReader dataReader, CancellationToken cancellationToken)
         {
             await concurrencyLimiter.WaitAsync(cancellationToken).ConfigureAwait(false);
