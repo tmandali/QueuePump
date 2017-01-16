@@ -20,6 +20,8 @@ namespace QueueProcessor
 
         public string Error { get; set; }
 
+        public DateTime DeliveryDate { get; set; }
+
         public dynamic Headers { get; set; }
         
 
@@ -103,6 +105,8 @@ namespace QueueProcessor
                     envelope.EndPoint = new Uri(await dataReader.GetFieldValueAsync<string>(i).ConfigureAwait(false));
                 else if (name == "ReplyTo")
                     envelope.ReplyTo = await dataReader.GetFieldValueAsync<string>(i).ConfigureAwait(false);
+                else if (name == "DeliveryDate")
+                    envelope.DeliveryDate = await dataReader.GetFieldValueAsync<DateTime>(i).ConfigureAwait(false);
                 else if (name == "Error")
                     envelope.Error = await GetNullableAsync<string>(dataReader, i).ConfigureAwait(false);
                 else
@@ -119,7 +123,6 @@ namespace QueueProcessor
             {
                 return default(T);
             }
-
             return await dataReader.GetFieldValueAsync<T>(index).ConfigureAwait(false);
         }
     }

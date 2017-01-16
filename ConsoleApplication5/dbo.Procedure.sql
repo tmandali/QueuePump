@@ -5,22 +5,16 @@
 )
 
 INSERT INTO [Queue]
-SELECT 'dbo.Test3'
+SELECT 'dbo.Test'
 
 
-CREATE TABLE [dbo].[Test_Log]
-(
-	[MessageId] UNIQUEIDENTIFIER NOT NULL,
-	[Xml] XML NOT NULL 	
-)
-
-GO
-
-CREATE TABLE [dbo].[Test4]
+CREATE TABLE [dbo].[Test]
 (
 	[Id] INT NOT NULL PRIMARY KEY, 
     [ReplyTo] SYSNAME NOT NULL, 
-    [EndPoint] SYSNAME NOT NULL
+    [EndPoint] SYSNAME NOT NULL,
+	[DeliveryDate] DATETIME NOT NULL,
+	[Error] NVARCHAR(4000),
 )
 
 GO
@@ -47,10 +41,9 @@ GO
 
 DELETE Test
 
-INSERT INTO [dbo].[Test] (Id, ReplyTo, EndPoint) 
-VALUES (1, 'dbo.sp_ExportTest','mssql://QueueHost.Local/nservicebus.dbo.sp_ImportTest')
+INSERT INTO [dbo].[Test] (Id, ReplyTo, EndPoint, DeliveryDate) 
+VALUES (3, 'dbo.sp_ExportTest','mssql://QueueHost.Local1/nservicebus.dbo.sp_ImportTest', GETUTCDATE())
 
 EXEC sp_ExportTest @To='xx',@Id=111
 
-DELETE Test_Log
-SELECT * FROM Test_Log
+SELECT * FROM Test

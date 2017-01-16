@@ -53,16 +53,17 @@ namespace QueueProcessor
                     
                     try
                     {
-                        if (await TryProcess(envelope).ConfigureAwait(false))
-                        {
-                            Trace.TraceInformation($"{Name}:{tableName} Processed message");
-                            transaction.Commit();
-                        }
+                        await TryProcess(envelope).ConfigureAwait(false);
+                        Trace.TraceInformation($"{Name}:{tableName} Processed message");
                     }
                     catch (Exception ex)
                     {
+                        Trace.TraceError($"{Name}:{tableName} Error : {ex.Message}");
                         await Rollback(connection, transaction, ct, envelope, ex).ConfigureAwait(false);
-                        throw ex;
+                    }
+                    finally
+                    {
+                        transaction.Commit();
                     }
                 }
             }            
@@ -121,7 +122,7 @@ namespace QueueProcessor
 
             --OUTPUT deleted.Id, deleted.CorrelationId, deleted.ReplyToAddress, deleted.Recoverable, deleted.Headers, deleted.Body;
 
-            WITH message AS (SELECT TOP(1) * FROM {tableName} WITH (UPDLOCK, READPAST, ROWLOCK)) -- WHERE [Expires] IS NULL OR [Expires] > GETUTCDATE() ORDER BY [RowVersion]
+            WITH message AS (SELECT TOP(1) * FROM {tableName} WITH (UPDLOCK, READPAST, ROWLOCK) WHERE [DeliveryDate] <= GETUTCDATE()) --DeliveryDate 
             DELETE FROM message
             OUTPUT deleted.*;
             IF(@NOCOUNT = 'ON') SET NOCOUNT ON;
@@ -150,6 +151,7 @@ namespace QueueProcessor
             var rec = (ICollection<KeyValuePair<string, object>>)envelope.Headers;
             rec.Add(new KeyValuePair<string, object>("ReplyTo", envelope.ReplyTo.ToString()));
             rec.Add(new KeyValuePair<string, object>("EndPoint", envelope.EndPoint.ToString()));
+            rec.Add(new KeyValuePair<string, object>("DeliveryDate", envelope.DeliveryDate.AddHours(1)));
             rec.Add(new KeyValuePair<string, object>("Error", ex.Message));
             //rec.Add(new KeyValuePair<string, object>("Retry", envelope.Retry + 1));
 
@@ -164,8 +166,6 @@ namespace QueueProcessor
                 command.Parameters.AddRange(cmdPrms);
                 await command.ExecuteNonQueryAsync().ConfigureAwait(false);
             }
-
-            transaction.Commit();
         }
     }
 }

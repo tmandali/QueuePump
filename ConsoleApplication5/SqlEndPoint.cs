@@ -38,7 +38,7 @@ namespace QueueProcessor
             var exportFile = Path.GetFullPath($@".\{adress.Host}\{from}\Log\{messageId}.xml");
             var transformReader = Transform(exportFile, reader, xsltPath);
 
-            using (var connection = await sqlConnectionFactory .OpenNewConnection().ConfigureAwait(false))
+            using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
             using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
             {
                 var commmand = new SqlCommand(procedureName, connection, transaction);
