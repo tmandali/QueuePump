@@ -18,6 +18,8 @@ namespace QueueProcessor
 
         public string ReplyTo { get; set; }
 
+        public string Error { get; set; }
+
         public dynamic Headers { get; set; }
         
 
@@ -101,8 +103,10 @@ namespace QueueProcessor
                     envelope.EndPoint = new Uri(await dataReader.GetFieldValueAsync<string>(i).ConfigureAwait(false));
                 else if (name == "ReplyTo")
                     envelope.ReplyTo = await dataReader.GetFieldValueAsync<string>(i).ConfigureAwait(false);
+                else if (name == "Error")
+                    envelope.Error = await GetNullableAsync<string>(dataReader, i).ConfigureAwait(false);
                 else
-                    headers.Add(new KeyValuePair<string, object>(name, await GetNullableAsync<object>(dataReader, i)));
+                    headers.Add(new KeyValuePair<string, object>(name, await GetNullableAsync<object>(dataReader, i).ConfigureAwait(false)));
             }
 
             envelope.Headers = headers;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Diagnostics;
@@ -7,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Schema;
+using System.Linq;
 
 namespace QueueProcessor
 {
@@ -32,15 +34,13 @@ namespace QueueProcessor
             
             while (!ct.IsCancellationRequested)
             {
-                var stopwatch = Stopwatch.StartNew();                
+                //var stopwatch = Stopwatch.StartNew();                
                 Envelope envelope = null;
 
                 using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
                 using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
                 {
                     envelope = await TryReceive(connection, transaction, ct).ConfigureAwait(false);
-
-                    stopwatch.Stop();
                   
                     if (envelope == null)
                     {
@@ -50,19 +50,19 @@ namespace QueueProcessor
                     }
 
                     Trace.TraceInformation($"{Name}:{tableName} Received message");
-
-                    stopwatch.Start();
-
-                    if (await TryProcess(envelope).ConfigureAwait(false))
+                    
+                    try
                     {
-                        stopwatch.Stop();
-                        Trace.TraceInformation($"{Name}:{tableName} Processed message");
-                        transaction.Commit();
+                        if (await TryProcess(envelope).ConfigureAwait(false))
+                        {
+                            Trace.TraceInformation($"{Name}:{tableName} Processed message");
+                            transaction.Commit();
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        Trace.TraceInformation($"{Name}:{tableName} Rollback message");
-                        transaction.Rollback();
+                        await Rollback(connection, transaction, ct, envelope, ex).ConfigureAwait(false);
+                        throw ex;
                     }
                 }
             }            
@@ -143,6 +143,29 @@ namespace QueueProcessor
                 }
                 return await Envelope.Read(dataReader).ConfigureAwait(false);
             }
+        }
+
+        async Task Rollback(SqlConnection connection, SqlTransaction transaction, CancellationToken ct, Envelope envelope, Exception ex)
+        {
+            var rec = (ICollection<KeyValuePair<string, object>>)envelope.Headers;
+            rec.Add(new KeyValuePair<string, object>("ReplyTo", envelope.ReplyTo.ToString()));
+            rec.Add(new KeyValuePair<string, object>("EndPoint", envelope.EndPoint.ToString()));
+            rec.Add(new KeyValuePair<string, object>("Error", ex.Message));
+            //rec.Add(new KeyValuePair<string, object>("Retry", envelope.Retry + 1));
+
+            var fields = string.Join(",", rec.Select(r => r.Key));
+            var fieldPrms = string.Join(",", rec.Select(r => "@" + r.Key));
+            var cmdPrms = rec.Select(r => new SqlParameter("@" + r.Key, r.Value)).ToArray();
+
+            string rollbackText = $@"insert into {tableName} ({fields}) values ({fieldPrms})";
+
+            using (var command = new SqlCommand(rollbackText, connection, transaction))
+            {
+                command.Parameters.AddRange(cmdPrms);
+                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+            }
+
+            transaction.Commit();
         }
     }
 }
