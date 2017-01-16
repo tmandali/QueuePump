@@ -51,7 +51,7 @@ namespace QueueProcessor
                 }
                 catch (Exception ex)
                 {
-                    Trace.TraceError($"Sql connector failed", ex);
+                    Trace.TraceError($"Sql connector failed => {ex.Message}", ex);
                 }
                 finally
                 {

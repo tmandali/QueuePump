@@ -23,14 +23,10 @@ namespace QueueProcessor
         {
             this.adress = adress;
             this.xsltFile = xsltFile ?? $"{adress.Host}.xslt";
-
-            var cnnStringList = new List<ConnectionStringSettings>();
-            foreach (ConnectionStringSettings item in ConfigurationManager.ConnectionStrings)
-                cnnStringList.Add(item);
-
-            connectionStringSettings = cnnStringList.Where(c => c.Name.Equals(adress.Host, StringComparison.CurrentCultureIgnoreCase)).SingleOrDefault();
+            
+            connectionStringSettings = ConfigurationManager.ConnectionStrings[adress.Host];
             if (connectionStringSettings == null)
-                throw new Exception($"Connection {adress.Host} not found !");
+                throw new Exception($" {adress.Host} connection settings not found !");
 
             sqlConnectionFactory = SqlConnectionFactory.Default(connectionStringSettings.ConnectionString);           
             procedureName = adress.Segments[1];
