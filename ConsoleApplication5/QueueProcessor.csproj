@@ -58,10 +58,10 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
-    <Content Include="QueueHost.Local\dbo.Test\queuehost.local.xslt">
+    <Content Include="QueueHost.Local1\dbo.Test\queuehost.local1.xslt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="QueueHost.Local\dbo.Test\schema.xsd">
+    <Content Include="QueueHost.Local1\dbo.Test\schema.xsd">
       <SubType>Designer</SubType>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
