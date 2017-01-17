@@ -32,11 +32,9 @@ namespace QueueProcessor
             procedureName = adress.Segments[1];
         }
         
-        public override async Task<bool> Send(Guid messageId, string from, XmlReader reader)
+        public override async Task<bool> Send(Guid messageId, string from, XmlReader input)
         {
-            var xsltPath = Path.GetFullPath($@".\{adress.Host}\{from}\{xsltFile}");
-            var exportFile = Path.GetFullPath($@".\{adress.Host}\{from}\Log\{messageId}.xml");
-            var transformReader = Transform(exportFile, reader, xsltPath);
+            var reader = Transform(messageId, adress.Host, from, xsltFile, input);
 
             using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
             using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))
@@ -45,14 +43,14 @@ namespace QueueProcessor
                 commmand.CommandType = CommandType.StoredProcedure;
                 commmand.Parameters.AddWithValue("@MessageId", messageId);
                 commmand.Parameters.AddWithValue("@From", from);
-                commmand.Parameters.AddWithValue("@Xml", new SqlXml(transformReader));
+                commmand.Parameters.AddWithValue("@Xml", new SqlXml(reader));
 
                 await commmand.ExecuteNonQueryAsync().ConfigureAwait(false);
 
                 transaction.Commit();
             }
 
-            transformReader.Close();
+            reader.Close();
             return true;
         }
     }
