@@ -1,4 +1,12 @@
-﻿CREATE TABLE [Queue]
+﻿CREATE SEQUENCE [dbo].[Queue_Seq] 
+ AS [bigint]
+ START WITH 1
+ INCREMENT BY 1
+ MINVALUE 1
+ CACHE 
+GO
+
+CREATE TABLE [Queue]
 (
 	[Table] SYSNAME NOT NULL,	
 	CONSTRAINT PK_Queue PRIMARY KEY ([Table])
@@ -10,11 +18,12 @@ SELECT 'dbo.Test'
 
 CREATE TABLE [dbo].[Test]
 (
-	[Id] INT NOT NULL PRIMARY KEY, 
+	[TableKey] INT NOT NULL, 
     [ReplyTo] SYSNAME NOT NULL, 
     [EndPoint] SYSNAME NOT NULL,
 	[DeliveryDate] DATETIME NOT NULL,
 	[Error] NVARCHAR(4000),
+	[RowVersion] BIGINT NOT NULL PRIMARY KEY DEFAULT NEXT VALUE FOR Queue_Seq,
 )
 
 GO
