@@ -75,7 +75,7 @@ namespace QueueProcessor
         public static async Task<Envelope> Read(SqlDataReader dataReader)
         {
             var result = await ReadRow(dataReader);
-            dataReader.Close();
+            //dataReader.Close();
             return result.TryParse();            
         }
 

@@ -59,9 +59,10 @@ namespace QueueProcessor
                     catch (Exception ex)
                     {
                         Trace.TraceError($"{Name}:{tableName} Error : {ex.Message}");
-                        await Rollback(connection, transaction, ct, envelope, ex).ConfigureAwait(false);
-                        transaction.Commit();
+                        await Rollback(connection, transaction, ct, envelope, ex).ConfigureAwait(false);                        
                     }
+
+                    transaction.Commit();
                 }
             }            
         }

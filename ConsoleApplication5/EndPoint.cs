@@ -47,7 +47,8 @@ namespace QueueProcessor
 
             var outputWriterSettings = new XmlWriterSettings() { Async = true };
 
-            using (var outputWriter = XmlWriter.Create(exportFile, outputWriterSettings))
+            var ms = new MemoryStream();
+            using (var outputWriter = XmlWriter.Create(ms, outputWriterSettings))
             {
                 if (File.Exists(xsltFile))
                 {
@@ -62,7 +63,9 @@ namespace QueueProcessor
                 }
 
                 outputWriter.Close();
-                return XmlReader.Create(exportFile);
+                ms.Seek(0, SeekOrigin.Begin);
+
+                return XmlReader.Create(ms);                
             }
         }
     }
