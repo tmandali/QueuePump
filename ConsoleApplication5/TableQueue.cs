@@ -147,10 +147,8 @@ namespace QueueProcessor
             rec.Add(new KeyValuePair<string, object>("ReplyTo", envelope.ReplyTo.ToString()));
             rec.Add(new KeyValuePair<string, object>("EndPoint", envelope.EndPoint.ToString()));
             rec.Add(new KeyValuePair<string, object>("DeliveryDate", envelope.DeliveryDate.AddHours(1)));
-            rec.Add(new KeyValuePair<string, object>("Error", ex.Message));
-            rec.Add(new KeyValuePair<string, object>("RowVersion", envelope.RowVersion));            
-
-            //rec.Add(new KeyValuePair<string, object>("Retry", envelope.Retry + 1));
+            rec.Add(new KeyValuePair<string, object>("Error",  $"{ex.GetType()}:\r{ex.Message}" ));
+            rec.Add(new KeyValuePair<string, object>("RowVersion", envelope.RowVersion));                        
 
             var fields = string.Join(",", rec.Select(r => r.Key));
             var fieldPrms = string.Join(",", rec.Select(r => "@" + r.Key));

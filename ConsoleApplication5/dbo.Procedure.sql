@@ -40,12 +40,12 @@ GO
 CREATE PROCEDURE [dbo].[sp_ExportTest]
 	@MessageId UNIQUEIDENTIFIER = NULL OUT,
 	@To NVARCHAR(900),	
-	@Id INT
+	@TableKey INT
 AS	
 	-- change messageId
-	SET @MessageId = CAST(HASHBYTES('MD5', cast(@Id as varchar)) AS UNIQUEIDENTIFIER) 
+	SET @MessageId = CAST(HASHBYTES('MD5', cast(@TableKey as varchar)) AS UNIQUEIDENTIFIER) 
 	--WAITFOR DELAY '00:00:05';
-	SELECT * FROM (SELECT @MessageId MessageId, @Id Id) Export FOR XML AUTO, TYPE
+	SELECT * FROM (SELECT @MessageId MessageId, @TableKey TableKey) Export FOR XML AUTO, TYPE
 GO
 
 DELETE Test
