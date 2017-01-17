@@ -35,7 +35,7 @@ namespace QueueProcessor
             var exportFile = Path.GetFullPath($@".\{host}\{from}\Log\{messageId}.xml");
                         
             Trace.TraceInformation($"Endpoint xml file : {exportFile}");
-            return await Transform(exportFile, xsltFile, input).ConfigureAwait(false);
+            return await Transform(exportFile, xsltPath, input).ConfigureAwait(false);
         }
 
         protected async Task<XmlReader> Transform(string exportFile, string xsltFile, XmlReader input)
@@ -44,7 +44,10 @@ namespace QueueProcessor
             if (!Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
 
-            using (var outputWriter = XmlWriter.Create(exportFile))
+
+            var outputWriterSettings = new XmlWriterSettings() { Async = true };
+
+            using (var outputWriter = XmlWriter.Create(exportFile, outputWriterSettings))
             {
                 if (File.Exists(xsltFile))
                 {
