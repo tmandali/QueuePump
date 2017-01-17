@@ -34,7 +34,7 @@ namespace QueueProcessor
         
         public override async Task<bool> Send(Guid messageId, string from, XmlReader input)
         {
-            var reader = Transform(messageId, adress.Host, from, xsltFile, input);
+            var reader = await Transform(messageId, adress.Host, from, xsltFile, input);
 
             using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
             using (var transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted))

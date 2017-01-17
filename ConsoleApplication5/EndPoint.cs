@@ -29,14 +29,16 @@ namespace QueueProcessor
             return Task.FromResult(result);
         }
 
-        protected static XmlReader Transform(Guid messageId, string host, string from, string xsltFile, XmlReader input)
+        protected async Task<XmlReader> Transform(Guid messageId, string host, string from, string xsltFile, XmlReader input)
         {
             var xsltPath = Path.GetFullPath($@".\{host}\{from}\{xsltFile}");
             var exportFile = Path.GetFullPath($@".\{host}\{from}\Log\{messageId}.xml");
-            return Transform(exportFile, xsltFile, input);
+                        
+            Trace.TraceInformation($"Endpoint xml file : {exportFile}");
+            return await Transform(exportFile, xsltFile, input).ConfigureAwait(false);
         }
 
-        protected static XmlReader Transform(string exportFile, string xsltFile, XmlReader input)
+        protected async Task<XmlReader> Transform(string exportFile, string xsltFile, XmlReader input)
         {
             var directory = Path.GetDirectoryName(exportFile);
             if (!Directory.Exists(directory))
@@ -49,15 +51,14 @@ namespace QueueProcessor
                     var xslt = new XslCompiledTransform();
                     xslt.Load(xsltFile);
                     xslt.Transform(input, outputWriter);
-                    Trace.TraceInformation($"Transform xml {xsltFile}");
+                    Trace.TraceInformation($"Transform xml file : {xsltFile}");
                 }
                 else
                 {
-                    outputWriter.WriteNode(input, false);
+                    await outputWriter.WriteNodeAsync(input, false).ConfigureAwait(false);
                 }
 
                 outputWriter.Close();
-                Trace.TraceInformation($"Endpoint xml file {exportFile}");
                 return XmlReader.Create(exportFile);
             }
         }
