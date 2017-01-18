@@ -59,12 +59,10 @@ namespace QueueProcessor
                     catch (Exception ex)
                     {
                         Trace.TraceError($"{Name}:{tableName} Error : {ex.Message}");
-                        await Rollback(connection, transaction, ct, envelope, ex).ConfigureAwait(false);
+                        await Rollback(connection, transaction, ct, envelope, ex).ConfigureAwait(false);                        
                     }
-                    finally
-                    {
-                        transaction.Commit();
-                    }
+
+                    transaction.Commit();
                 }
             }            
         }
@@ -119,10 +117,8 @@ namespace QueueProcessor
             DECLARE @NOCOUNT VARCHAR(3) = 'OFF';
             IF ( (512 & @@OPTIONS) = 512 ) SET @NOCOUNT = 'ON';
             SET NOCOUNT ON;
-
-            --OUTPUT deleted.Id, deleted.CorrelationId, deleted.ReplyToAddress, deleted.Recoverable, deleted.Headers, deleted.Body;
-
-            WITH message AS (SELECT TOP(1) * FROM {tableName} WITH (UPDLOCK, READPAST, ROWLOCK) WHERE [DeliveryDate] <= GETUTCDATE()) --DeliveryDate 
+            
+            WITH message AS (SELECT TOP(1) * FROM {tableName} WITH (UPDLOCK, READPAST, ROWLOCK) WHERE [DeliveryDate] <= GETUTCDATE() ORDER BY [RowVersion]) 
             DELETE FROM message
             OUTPUT deleted.*;
             IF(@NOCOUNT = 'ON') SET NOCOUNT ON;
@@ -152,8 +148,8 @@ namespace QueueProcessor
             rec.Add(new KeyValuePair<string, object>("ReplyTo", envelope.ReplyTo.ToString()));
             rec.Add(new KeyValuePair<string, object>("EndPoint", envelope.EndPoint.ToString()));
             rec.Add(new KeyValuePair<string, object>("DeliveryDate", envelope.DeliveryDate.AddHours(1)));
-            rec.Add(new KeyValuePair<string, object>("Error", ex.Message));
-            //rec.Add(new KeyValuePair<string, object>("Retry", envelope.Retry + 1));
+            rec.Add(new KeyValuePair<string, object>("Error",  $"{ex.GetType()}:\r{ex.Message}" ));
+            rec.Add(new KeyValuePair<string, object>("RowVersion", envelope.RowVersion));                        
 
             var fields = string.Join(",", rec.Select(r => r.Key));
             var fieldPrms = string.Join(",", rec.Select(r => "@" + r.Key));

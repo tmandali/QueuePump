@@ -22,6 +22,8 @@ namespace QueueProcessor
 
         public DateTime DeliveryDate { get; set; }
 
+        public long RowVersion { get; set; }
+
         public dynamic Headers { get; set; }
         
 
@@ -73,7 +75,7 @@ namespace QueueProcessor
         public static async Task<Envelope> Read(SqlDataReader dataReader)
         {
             var result = await ReadRow(dataReader);
-            dataReader.Close();
+            //dataReader.Close();
             return result.TryParse();            
         }
 
@@ -109,6 +111,8 @@ namespace QueueProcessor
                     envelope.DeliveryDate = await dataReader.GetFieldValueAsync<DateTime>(i).ConfigureAwait(false);
                 else if (name == "Error")
                     envelope.Error = await GetNullableAsync<string>(dataReader, i).ConfigureAwait(false);
+                else if (name == "RowVersion")
+                    envelope.RowVersion = await dataReader.GetFieldValueAsync<long>(i).ConfigureAwait(false);
                 else
                     headers.Add(new KeyValuePair<string, object>(name, await GetNullableAsync<object>(dataReader, i).ConfigureAwait(false)));
             }

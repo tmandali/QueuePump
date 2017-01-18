@@ -10,7 +10,7 @@ namespace QueueProcessor
     public abstract class EndPoint
     {
         public abstract Task<bool> Send(Guid messageId, string from, XmlReader reader);
-        protected abstract void Init(Uri adress, string xsltFile = null);        
+        protected abstract void Init(Uri adress, string xsltFile = null);
 
         public static Task<EndPoint> Factory(Envelope envelope)
         {
@@ -29,28 +29,43 @@ namespace QueueProcessor
             return Task.FromResult(result);
         }
 
-        protected static XmlReader Transform(string exportFile , XmlReader input, string xsltFile)
+        protected async Task<XmlReader> Transform(Guid messageId, string host, string from, string xsltFile, XmlReader input)
+        {
+            var xsltPath = Path.GetFullPath($@".\{host}\{from}\{xsltFile}");
+            var exportFile = Path.GetFullPath($@".\{host}\{from}\Log\{messageId}.xml");
+                        
+            Trace.TraceInformation($"Endpoint xml file : {exportFile}");
+            return await Transform(exportFile, xsltPath, input).ConfigureAwait(false);
+        }
+
+        protected async Task<XmlReader> Transform(string exportFile, string xsltFile, XmlReader input)
         {
             var directory = Path.GetDirectoryName(exportFile);
             if (!Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
 
-            using (var outputWriter = XmlWriter.Create(exportFile))
+
+            var outputWriterSettings = new XmlWriterSettings() { Async = true };
+
+            var ms = new MemoryStream();
+            using (var outputWriter = XmlWriter.Create(ms, outputWriterSettings))
             {
                 if (File.Exists(xsltFile))
                 {
                     var xslt = new XslCompiledTransform();
                     xslt.Load(xsltFile);
                     xslt.Transform(input, outputWriter);
-                    Trace.TraceInformation($"Xslt Transform {xsltFile}");
+                    Trace.TraceInformation($"Transform xml file : {xsltFile}");
                 }
                 else
                 {
-                    outputWriter.WriteNode(input, false);
+                    await outputWriter.WriteNodeAsync(input, false).ConfigureAwait(false);
                 }
+
                 outputWriter.Close();
-                Trace.TraceInformation($"Log file {exportFile}");
-                return XmlReader.Create(exportFile);
+                ms.Seek(0, SeekOrigin.Begin);
+
+                return XmlReader.Create(ms);                
             }
         }
     }

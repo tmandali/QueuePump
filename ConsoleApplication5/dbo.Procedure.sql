@@ -1,4 +1,12 @@
-﻿CREATE TABLE [Queue]
+﻿CREATE SEQUENCE [dbo].[Queue_Seq] 
+ AS [bigint]
+ START WITH 1
+ INCREMENT BY 1
+ MINVALUE 1
+ CACHE 
+GO
+
+CREATE TABLE [Queue]
 (
 	[Table] SYSNAME NOT NULL,	
 	CONSTRAINT PK_Queue PRIMARY KEY ([Table])
@@ -10,11 +18,12 @@ SELECT 'dbo.Test'
 
 CREATE TABLE [dbo].[Test]
 (
-	[Id] INT NOT NULL PRIMARY KEY, 
+	[TableKey] INT NOT NULL, 
     [ReplyTo] SYSNAME NOT NULL, 
     [EndPoint] SYSNAME NOT NULL,
 	[DeliveryDate] DATETIME NOT NULL,
 	[Error] NVARCHAR(4000),
+	[RowVersion] BIGINT NOT NULL PRIMARY KEY DEFAULT NEXT VALUE FOR Queue_Seq,
 )
 
 GO
@@ -31,12 +40,12 @@ GO
 CREATE PROCEDURE [dbo].[sp_ExportTest]
 	@MessageId UNIQUEIDENTIFIER = NULL OUT,
 	@To NVARCHAR(900),	
-	@Id INT
+	@TableKey INT
 AS	
 	-- change messageId
-	SET @MessageId = CAST(HASHBYTES('MD5', cast(@Id as varchar)) AS UNIQUEIDENTIFIER) 
+	SET @MessageId = CAST(HASHBYTES('MD5', cast(@TableKey as varchar)) AS UNIQUEIDENTIFIER) 
 	--WAITFOR DELAY '00:00:05';
-	SELECT * FROM (SELECT @MessageId MessageId, @Id Id) Export FOR XML AUTO, TYPE
+	SELECT * FROM (SELECT @MessageId MessageId, @TableKey TableKey) Export FOR XML AUTO, TYPE
 GO
 
 DELETE Test
