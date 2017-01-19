@@ -13,7 +13,7 @@ namespace QueueProcessor
     {
         ConnectionStringSettings host;
         SqlConnectionFactory sqlConnectionFactory;
-        SemaphoreSlim concurrencyLimiter;
+        //SemaphoreSlim concurrencyLimiter;
         ConcurrentDictionary<Task, Task> runningReceiveTasks;
         TaskQueue taskQueue;
 
@@ -30,11 +30,10 @@ namespace QueueProcessor
             {
                 try
                 {
-                    concurrencyLimiter = new SemaphoreSlim(maxConcurrency);
-                    runningReceiveTasks = new ConcurrentDictionary<Task, Task>();
+                    //concurrencyLimiter = new SemaphoreSlim(maxConcurrency);
+                    //runningReceiveTasks = new ConcurrentDictionary<Task, Task>();
                     sqlConnectionFactory = SqlConnectionFactory.Default(host.ConnectionString);
-
-                    await Processor(cancellationToken).ConfigureAwait(false);
+                    await Processor(cancellationToken).ConfigureAwait(false);                    
                     //await Task.WhenAll(runningReceiveTasks.Values).ConfigureAwait(false);
 
                     Trace.TraceInformation($"{host.Name} wait {retry}");
@@ -59,7 +58,7 @@ namespace QueueProcessor
                 }
                 finally
                 {
-                    concurrencyLimiter.Dispose();
+                    //concurrencyLimiter.Dispose();
                 }
             }
         }
@@ -83,7 +82,7 @@ namespace QueueProcessor
 
             var tableName = await dataReader.GetFieldValueAsync<string>(0).ConfigureAwait(false);
             var concurrency = await dataReader.GetFieldValueAsync<byte>(1).ConfigureAwait(false);
-            await Receiver(concurrency, tableName, cancellationToken);
+            await Receiver(concurrency, tableName, cancellationToken).ConfigureAwait(false);
 
             //var receive = Receiver(tableName, cancellationToken);
             //runningReceiveTasks.TryAdd(receive, receive);
@@ -105,14 +104,10 @@ namespace QueueProcessor
                 var queue = new TableQueue(host.Name, tableName, host.ConnectionString);
                 var paralel = Enumerable.Range(1, concurrency).Select(s => taskQueue.Enqueue(() => queue.Receive(cancellationToken)));
                 await Task.WhenAll(paralel);
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }  
+            }         
             finally
             {
-                concurrencyLimiter.Release();
+                //concurrencyLimiter.Release();
             }                         
         }
     }
