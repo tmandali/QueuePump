@@ -22,7 +22,7 @@ namespace QueueProcessor
 
         async static Task AsyncMain(Program prg)
         {
-            prg.Init().Start(4, TimeSpan.FromSeconds(10));            
+            prg.Init().Start(10, TimeSpan.FromSeconds(10));            
             Console.ReadLine();            
             await prg.Stop();
         }
@@ -34,9 +34,9 @@ namespace QueueProcessor
             return this;
         }
    
-        void Start(int maxConcurrency, TimeSpan retry)
+        void Start(int maxConcurrencyPerHost, TimeSpan retry)
         {
-            hosts = hostlist.Select(h => new HostConnect(h).Starter(maxConcurrency, retry, cancellationTokenSource.Token)).ToArray();
+            hosts = hostlist.Select(h => new HostConnect(h).Starter(maxConcurrencyPerHost, retry, cancellationTokenSource.Token)).ToArray();
             Trace.TraceInformation("Service started");
         }
 
