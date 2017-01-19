@@ -22,7 +22,7 @@ namespace QueueProcessor
 
         async static Task AsyncMain(Program prg)
         {
-            prg.Init().Start(5, TimeSpan.FromSeconds(10));            
+            prg.Init().Start(Environment.ProcessorCount, TimeSpan.FromSeconds(10));            
             Console.ReadLine();            
             await prg.Stop();
         }
