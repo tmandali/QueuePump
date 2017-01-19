@@ -9,6 +9,7 @@ GO
 CREATE TABLE [Queue]
 (
 	[Table] SYSNAME NOT NULL,	
+	[Concurrency] TINYINT NOT NULL,	
 	CONSTRAINT PK_Queue PRIMARY KEY ([Table])
 )
 
