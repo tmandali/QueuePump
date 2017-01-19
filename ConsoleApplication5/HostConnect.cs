@@ -15,7 +15,7 @@ namespace QueueProcessor
         SqlConnectionFactory sqlConnectionFactory;
         SemaphoreSlim concurrencyLimiter;
         ConcurrentDictionary<Task, Task> runningReceiveTasks;
-        int maxConcurrency;
+        TaskQueue taskQueue;
 
         public HostConnect(ConnectionStringSettings host)
         {
@@ -24,7 +24,8 @@ namespace QueueProcessor
 
         public async Task Starter(int maxConcurrency, TimeSpan retry, CancellationToken cancellationToken)
         {
-            this.maxConcurrency = maxConcurrency;
+            taskQueue = new TaskQueue(maxConcurrency);            
+
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
@@ -67,7 +68,7 @@ namespace QueueProcessor
         {
             using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
             {                
-                var command = new SqlCommand("SELECT [Table] FROM [Queue]", connection);
+                var command = new SqlCommand("SELECT [Table], [Concurrency] FROM [Queue]", connection);
                 var dataReader = await command.ExecuteReaderAsync().ConfigureAwait(false);
                 while (await TryReadQueue(dataReader, cancellationToken).ConfigureAwait(false) && !cancellationToken.IsCancellationRequested) {};                
             }
@@ -81,7 +82,8 @@ namespace QueueProcessor
                 return false;
 
             var tableName = await dataReader.GetFieldValueAsync<string>(0).ConfigureAwait(false);
-            await Receiver(tableName, cancellationToken);
+            var concurrency = await dataReader.GetFieldValueAsync<byte>(1).ConfigureAwait(false);
+            await Receiver(concurrency, tableName, cancellationToken);
 
             //var receive = Receiver(tableName, cancellationToken);
             //runningReceiveTasks.TryAdd(receive, receive);
@@ -96,10 +98,10 @@ namespace QueueProcessor
             return true;
         }
 
-        async Task Receiver(string tableName, CancellationToken cancellationToken)
+        async Task Receiver(byte concurrency, string tableName, CancellationToken cancellationToken)
         {            
             var queue = new TableQueue(host.Name, tableName, host.ConnectionString);
-            var paralel = Enumerable.Range(1, maxConcurrency).Select(s=>queue.Receive(cancellationToken));
+            var paralel = Enumerable.Range(1, concurrency).Select(s=> taskQueue.Enqueue(()=>queue.Receive(cancellationToken)));
             await Task.WhenAll(paralel);
             
             concurrencyLimiter.Release();
