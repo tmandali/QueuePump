@@ -48,7 +48,7 @@ namespace QueueProcessor
                 {
                     Trace.TraceError("Exception thrown during cancellation", e);
                 }
-                catch (SqlException e) when (e.ErrorCode == - 2146232060)
+                catch (SqlException e) when (e.Number == - 1)
                 {
                     //Trace.TraceError($"Sql connection failed, retry {retry}");
                     await Task.Delay(retry, cancellationToken).ConfigureAwait(false);
@@ -99,12 +99,21 @@ namespace QueueProcessor
         }
 
         async Task Receiver(byte concurrency, string tableName, CancellationToken cancellationToken)
-        {            
-            var queue = new TableQueue(host.Name, tableName, host.ConnectionString);
-            var paralel = Enumerable.Range(1, concurrency).Select(s=> taskQueue.Enqueue(()=>queue.Receive(cancellationToken)));
-            await Task.WhenAll(paralel);
-            
-            concurrencyLimiter.Release();
+        {
+            try
+            {
+                var queue = new TableQueue(host.Name, tableName, host.ConnectionString);
+                var paralel = Enumerable.Range(1, concurrency).Select(s => taskQueue.Enqueue(() => queue.Receive(cancellationToken)));
+                await Task.WhenAll(paralel);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }  
+            finally
+            {
+                concurrencyLimiter.Release();
+            }                         
         }
     }
 }
