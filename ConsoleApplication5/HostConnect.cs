@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Configuration;
 using System.Data.SqlClient;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,6 +15,7 @@ namespace QueueProcessor
         SqlConnectionFactory sqlConnectionFactory;
         SemaphoreSlim concurrencyLimiter;
         ConcurrentDictionary<Task, Task> runningReceiveTasks;
+        int maxConcurrency;
 
         public HostConnect(ConnectionStringSettings host)
         {
@@ -22,6 +24,7 @@ namespace QueueProcessor
 
         public async Task Starter(int maxConcurrency, TimeSpan retry, CancellationToken cancellationToken)
         {
+            this.maxConcurrency = maxConcurrency;
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
@@ -31,7 +34,7 @@ namespace QueueProcessor
                     sqlConnectionFactory = SqlConnectionFactory.Default(host.ConnectionString);
 
                     await Processor(cancellationToken).ConfigureAwait(false);
-                    await Task.WhenAll(runningReceiveTasks.Values).ConfigureAwait(false);
+                    //await Task.WhenAll(runningReceiveTasks.Values).ConfigureAwait(false);
 
                     Trace.TraceInformation($"{host.Name} wait {retry}");
                     await Task.Delay(retry, cancellationToken).ConfigureAwait(false);
@@ -74,30 +77,33 @@ namespace QueueProcessor
 
         async Task<bool> TryReadQueue(SqlDataReader dataReader, CancellationToken cancellationToken)
         {
-            await concurrencyLimiter.WaitAsync(cancellationToken).ConfigureAwait(false);
+            //await concurrencyLimiter.WaitAsync(cancellationToken).ConfigureAwait(false);
 
             if (!await dataReader.ReadAsync().ConfigureAwait(false))
                 return false;
 
             var tableName = await dataReader.GetFieldValueAsync<string>(0).ConfigureAwait(false);
+            await Receiver(tableName, cancellationToken);
 
-            var receive = Receiver(tableName, cancellationToken);
-            runningReceiveTasks.TryAdd(receive, receive);
+            //var receive = Receiver(tableName, cancellationToken);
+            //runningReceiveTasks.TryAdd(receive, receive);
 
-            var receiver = receive.ContinueWith((t, state) =>
-            {
-                var receiveTasks = (ConcurrentDictionary<Task, Task>) state;
-                Task toBeRemoved;
-                receiveTasks.TryRemove(t, out toBeRemoved);
-            }, runningReceiveTasks, TaskContinuationOptions.ExecuteSynchronously);
-            
+            //var receiver = receive.ContinueWith((t, state) =>
+            //{
+            //    var receiveTasks = (ConcurrentDictionary<Task, Task>) state;
+            //    Task toBeRemoved;
+            //    receiveTasks.TryRemove(t, out toBeRemoved);
+            //}, runningReceiveTasks, TaskContinuationOptions.ExecuteSynchronously);
+
             return true;
         }
 
         async Task Receiver(string tableName, CancellationToken cancellationToken)
-        {
+        {            
             var queue = new TableQueue(host.Name, tableName, host.ConnectionString);
-            await queue.Receive(cancellationToken);
+            var paralel = Enumerable.Range(1, maxConcurrency).Select(s=>queue.Receive(cancellationToken));
+            await Task.WhenAll(paralel);
+            
             concurrencyLimiter.Release();
         }
     }
