@@ -1,4 +1,4 @@
-﻿using System.Data;
+﻿using System.Dynamic;
 using System.Threading;
 using System.Transactions;
 
@@ -6,12 +6,13 @@ namespace QueueProcessor
 {
     public class MessageContext
     {        
-        public MessageContext(TransactionScope transportTransaction)
+        public MessageContext(ExpandoObject body, TransactionScope transportTransaction)
         {
             TransportTransaction = transportTransaction;
+            Body = body;
         }
 
-        public Message Body { get; }
+        public ExpandoObject Body { get; }
         public CancellationTokenSource ReceiveCancellationTokenSource { get; }
         public TransactionScope TransportTransaction { get; }
     }

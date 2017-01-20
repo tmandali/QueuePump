@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Dynamic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -156,7 +157,7 @@ namespace QueueProcessor
 
         async Task ReceiveMessage(CancellationTokenSource receiveCancellationTokenSource)
         {
-            Message message = null;
+            ExpandoObject message = null;
             try
             {
                 using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, TimeSpan.FromSeconds(1), TransactionScopeAsyncFlowOption.Enabled))
@@ -193,11 +194,11 @@ namespace QueueProcessor
             }
         }
 
-        async Task<bool> TryProcess(Message message, TransactionScope transportTransaction)
+        async Task<bool> TryProcess(ExpandoObject message, TransactionScope transportTransaction)
         {
             using (var pushCancellationTokenSource = new CancellationTokenSource())
             {
-                var messageContext = new MessageContext(transportTransaction);
+                var messageContext = new MessageContext(message, transportTransaction);
 
                 await onMessage(messageContext).ConfigureAwait(false);
 
@@ -209,9 +210,9 @@ namespace QueueProcessor
             }
         }
 
-        async Task<Message> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationTokenSource receiveCancellationTokenSource)
+        async Task<ExpandoObject> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationTokenSource receiveCancellationTokenSource)
         {
-            var commandText = $"select top 1 from {inputQueue}"; 
+            var commandText = $"select top 1 * from {inputQueue}"; 
 
             using (var command = new SqlCommand(commandText, connection, transaction))
             {
@@ -219,7 +220,7 @@ namespace QueueProcessor
             }
         }
 
-        static async Task<Message> ReadMessage(SqlCommand command)
+        static async Task<ExpandoObject> ReadMessage(SqlCommand command)
         {
             // We need sequential access to not buffer everything into memory
             using (var dataReader = await command.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow | System.Data.CommandBehavior.SequentialAccess).ConfigureAwait(false))
@@ -229,10 +230,33 @@ namespace QueueProcessor
                     return null;
                 }
 
-                //var readResult = await MessageRow.Read(dataReader).ConfigureAwait(false);
+                var readResult = await ReadRow(dataReader).ConfigureAwait(false);
 
-                return null; // readResult;
+                return readResult;
             }
+        }
+
+        static async Task<ExpandoObject> ReadRow(SqlDataReader dataReader)
+        {
+            var result = new ExpandoObject();
+
+            var properyBag = (ICollection<KeyValuePair<string, object>>) result;
+            for (int i = 0; i < dataReader.FieldCount; i++)
+            {
+                string name = dataReader.GetName(i);
+                properyBag.Add(new KeyValuePair<string, object>(name, await GetNullableAsync<object>(dataReader, i).ConfigureAwait(false)));
+            }
+
+            return result;
+        }
+
+        static async Task<T> GetNullableAsync<T>(SqlDataReader dataReader, int index) 
+        {
+            if (await dataReader.IsDBNullAsync(index).ConfigureAwait(false))
+            {
+                return default(T);
+            }
+            return await dataReader.GetFieldValueAsync<T>(index).ConfigureAwait(false);
         }
 
         async Task<int> Peek(TimeSpan delay, CancellationToken cancellationToken)

@@ -18,7 +18,7 @@ namespace QueueProcessor
             await mp.Init(
                 context => { return Task.FromResult(0); },
                 "dbo.Test", 
-                "Data Source=.;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10; Pooling = true; Min Pool Size = 20; Max Pool Size = 200;");
+                "Data Source=.\\sqlexpress;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;");
 
             mp.Start();
             Console.ReadLine();
