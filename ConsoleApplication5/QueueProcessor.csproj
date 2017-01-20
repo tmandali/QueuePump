@@ -45,14 +45,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="TaskQueue.cs" />
-    <Compile Include="HostConnect.cs" />
-    <Compile Include="EndPoint.cs" />
-    <Compile Include="SqlEndPoint.cs" />
-    <Compile Include="Envelope.cs" />
-    <Compile Include="IQueue.cs" />
-    <Compile Include="TableQueue.cs" />
-    <Compile Include="SqlConnectionFactory.cs" />
+    <Compile Include="TableQueue\Service.cs" />
+    <Compile Include="TableQueue\TaskQueue.cs" />
+    <Compile Include="TableQueue\HostConnect.cs" />
+    <Compile Include="TableQueue\EndPoint.cs" />
+    <Compile Include="TableQueue\SqlEndPoint.cs" />
+    <Compile Include="TableQueue\Envelope.cs" />
+    <Compile Include="TableQueue\IQueue.cs" />
+    <Compile Include="TableQueue\TableQueue.cs" />
+    <Compile Include="TableQueue\SqlConnectionFactory.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -68,7 +69,7 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="dbo.Procedure.sql" />
+    <Content Include="TableQueue\dbo.Procedure.sql" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
