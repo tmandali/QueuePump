@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace QueueProcessor
 {
@@ -16,7 +18,15 @@ namespace QueueProcessor
             var mp = new MessagePump();
 
             await mp.Init(
-                context => { return Task.FromResult(0); },
+                context => {
+                    var propertyBag = (ICollection<KeyValuePair<string, object>>) context.Body;
+                    propertyBag.Select(s => $"{s.Key}:{s.Value}")
+                    .ToList()
+                    .ForEach(f => {
+                        Console.WriteLine(f);
+                    });                    
+                    return Task.FromResult(0);
+                },
                 "dbo.Test", 
                 "Data Source=.\\sqlexpress;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;");
 
