@@ -8,8 +8,9 @@ namespace QueueProcessor
 {
     public class MessageContext
     {        
-        public MessageContext(ExpandoObject body, TransactionScope transportTransaction)
+        public MessageContext(ExpandoObject body, TransactionScope transportTransaction, CancellationTokenSource receiveCancellationTokenSource)
         {
+            ReceiveCancellationTokenSource = receiveCancellationTokenSource;
             TransportTransaction = transportTransaction;
             Body = body;
         }

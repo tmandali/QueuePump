@@ -1,16 +1,15 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Data.SqlClient;
-using System.Dynamic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Transactions;
-
-namespace QueueProcessor
+﻿namespace QueueProcessor
 {
+    using System;
+    using System.Collections.Concurrent;
+    using System.Collections.Generic;
+    using System.Data.SqlClient;
+    using System.Dynamic;
+    using System.Linq;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using System.Transactions;
+
     public class MessagePump
     {
         ConcurrentDictionary<Task, Task> runningReceiveTasks;
@@ -46,7 +45,6 @@ namespace QueueProcessor
             const int timeoutDurationInSeconds = 30;
             cancellationTokenSource.Cancel();
 
-            // ReSharper disable once MethodSupportsCancellation
             var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutDurationInSeconds));
             var allTasks = runningReceiveTasks.Values.Concat(new[]
             {
@@ -160,7 +158,7 @@ namespace QueueProcessor
             ExpandoObject message = null;
             try
             {
-                using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, TimeSpan.FromSeconds(1), TransactionScopeAsyncFlowOption.Enabled))
+                using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, TimeSpan.FromSeconds(30), TransactionScopeAsyncFlowOption.Enabled))
                 using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
                 {
                     message = await TryReceive(connection, null, receiveCancellationTokenSource).ConfigureAwait(false);
@@ -198,8 +196,7 @@ namespace QueueProcessor
         {
             using (var pushCancellationTokenSource = new CancellationTokenSource())
             {
-                var messageContext = new MessageContext(message, transportTransaction);
-
+                var messageContext = new MessageContext(message, transportTransaction, pushCancellationTokenSource);
                 await onMessage(messageContext).ConfigureAwait(false);
 
                 // Cancellation is requested when message processing is aborted.
@@ -297,7 +294,7 @@ namespace QueueProcessor
 
         async Task<int> TryPeek(SqlConnection connection, CancellationToken token, int timeoutInSeconds = 30)
         {
-            var commandText = $"select count(*) from {inputQueue}";//Format(Sql.PeekText, schemaName, tableName);
+            var commandText = $"select count(*) from {inputQueue}";
 
             using (var command = new SqlCommand(commandText, connection)
             {
