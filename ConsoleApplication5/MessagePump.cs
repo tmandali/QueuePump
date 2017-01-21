@@ -158,7 +158,12 @@
             ExpandoObject message = null;
             try
             {
-                using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, TimeSpan.FromSeconds(30), TransactionScopeAsyncFlowOption.Enabled))
+                var transactionOptions = new TransactionOptions() {
+                    IsolationLevel = IsolationLevel.ReadCommitted,
+                    Timeout = TimeSpan.FromSeconds(30)
+                };
+
+                using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, transactionOptions, TransactionScopeAsyncFlowOption.Enabled))
                 using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
                 {
                     message = await TryReceive(connection, null, receiveCancellationTokenSource).ConfigureAwait(false);
@@ -209,9 +214,18 @@
 
         async Task<ExpandoObject> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationTokenSource receiveCancellationTokenSource)
         {
-            var commandText = $"select top 1 * from {inputQueue}"; 
+            string receiveText = $@"
+            DECLARE @NOCOUNT VARCHAR(3) = 'OFF';
+            IF ( (512 & @@OPTIONS) = 512 ) SET @NOCOUNT = 'ON';
+            SET NOCOUNT ON;
+            
+            WITH message AS (SELECT TOP(1) * FROM {inputQueue} WITH (UPDLOCK, READPAST, ROWLOCK) WHERE [DeliveryDate] <= GETUTCDATE() ORDER BY [RowVersion]) 
+            DELETE FROM message
+            OUTPUT deleted.*;
+            IF(@NOCOUNT = 'ON') SET NOCOUNT ON;
+            IF(@NOCOUNT = 'OFF') SET NOCOUNT OFF;";
 
-            using (var command = new SqlCommand(commandText, connection, transaction))
+            using (var command = new SqlCommand(receiveText, connection, transaction))
             {
                 return await ReadMessage(command).ConfigureAwait(false);
             }

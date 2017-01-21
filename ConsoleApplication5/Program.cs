@@ -28,7 +28,7 @@ namespace QueueProcessor
                     return Task.FromResult(0);
                 },
                 "dbo.Test", 
-                "Data Source=.\\sqlexpress;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;");
+                "Data Source=.;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;");
 
             mp.Start();
             Console.ReadLine();
