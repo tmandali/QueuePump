@@ -9,7 +9,7 @@
     using System.Threading;
     using System.Threading.Tasks;
     using System.Linq;
-    //using static System.String;
+    using static System.String;
 
     public class TableBaseQueue
     {
@@ -92,13 +92,14 @@
                     return null;
                 }
 
-                var readResult = await ReadRow(keys, dataReader).ConfigureAwait(false);
+                var readResult = await ReadRow(dataReader).ConfigureAwait(false);
+                var messageId = ConvertToMd5HashGUID(Join("@", readResult.Where(w => keys.Contains(w.Key)).Select(s => s.Value)));
 
-                return readResult;
+                return new Message(messageId, readResult);         
             }
         }
 
-        static async Task<Message> ReadRow(string[] keys, SqlDataReader dataReader)
+        static async Task<ExpandoObject> ReadRow(SqlDataReader dataReader)
         {
             var body = new ExpandoObject();
 
@@ -109,9 +110,7 @@
                 properyBag.Add(new KeyValuePair<string, object>(name, await GetNullableAsync<object>(dataReader, i).ConfigureAwait(false)));
             }
 
-            string messageId = string.Join("@", body.Where(w => keys.Contains(w.Key)).Select(s => s.Value));
-
-            return new Message(ConvertToMd5HashGUID(messageId), body);
+            return body;
         }
 
         static async Task<T> GetNullableAsync<T>(SqlDataReader dataReader, int index)
