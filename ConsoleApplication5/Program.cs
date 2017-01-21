@@ -21,10 +21,10 @@ namespace QueueProcessor
                 context => 
                 {
                     //var propertyBag = (ICollection<KeyValuePair<string, object>>) context.Body;
-                    dynamic obj = context.Body;
+                    //dynamic obj = context.Message;
 
-                    if (obj.RowVersion == 9178)
-                        throw new Exception($"Hata : {obj.RowVersion}");                    
+                    //if (obj.RowVersion == 9178)
+                    //    throw new Exception($"Hata : {obj.RowVersion}");                    
 
                     return Task.FromResult(0);
                 },
@@ -32,7 +32,7 @@ namespace QueueProcessor
                 {
                     return Task.FromResult(ErrorHandleResult.RetryRequired);
                 },
-                new TableBaseQueue("dbo","Test"), 
+                new TableBaseQueue("dbo","Test", new[] {"RowVersion"}), 
                 "Data Source=.;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;");
 
             mp.Start();

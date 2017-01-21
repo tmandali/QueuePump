@@ -10,7 +10,7 @@ namespace QueueProcessor
 {
     public class ErrorContext
     {        
-        public ErrorContext(Exception exception, ExpandoObject message, TransactionScope transportTransaction, int processingAttempts)
+        public ErrorContext(Exception exception, Message message, TransactionScope transportTransaction, int processingAttempts)
         {
             Exception = exception;
             Message = message;
@@ -20,7 +20,7 @@ namespace QueueProcessor
 
         public int DelayedDeliveriesPerformed { get; }
         public Exception Exception { get; }
-        public ExpandoObject Message { get; }        
+        public Message Message { get; }        
         public TransactionScope TransportTransaction { get; }
     }
 }

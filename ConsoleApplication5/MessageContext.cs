@@ -6,14 +6,14 @@ namespace QueueProcessor
 {
     public class MessageContext
     {        
-        public MessageContext(ExpandoObject body, TransactionScope transportTransaction, CancellationTokenSource receiveCancellationTokenSource)
+        public MessageContext(Message message, TransactionScope transportTransaction, CancellationTokenSource receiveCancellationTokenSource)
         {
             ReceiveCancellationTokenSource = receiveCancellationTokenSource;
             TransportTransaction = transportTransaction;
-            Body = body;
+            Message = message;
         }
 
-        public ExpandoObject Body { get; }
+        public Message Message { get; }
         public CancellationTokenSource ReceiveCancellationTokenSource { get; }
         public TransactionScope TransportTransaction { get; }
     }

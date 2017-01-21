@@ -8,8 +8,7 @@
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
-    using System.Transactions;
-    //using static System.String;
+    using System.Transactions;    
 
     public class MessagePump
     {
@@ -161,7 +160,7 @@
 
         async Task ReceiveMessage(CancellationTokenSource receiveCancellationTokenSource)
         {
-            dynamic message = null;
+            Message message = null;
             try
             {
                 using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted, Timeout = TimeSpan.FromSeconds(30) }, TransactionScopeAsyncFlowOption.Enabled))
@@ -187,7 +186,7 @@
 
                     scope.Complete();
 
-                    failureInfoStorage.ClearFailureInfoForMessage(message.RowVersion.ToString());
+                    failureInfoStorage.ClearFailureInfoForMessage(message.MessageId.ToString());
                 }
 
             }
@@ -198,11 +197,11 @@
                     throw;
                 }
 
-                failureInfoStorage.RecordFailureInfoForMessage(message.RowVersion.ToString(), exception);
+                failureInfoStorage.RecordFailureInfoForMessage(message.MessageId.ToString(), exception);
             }
         }
 
-        protected async Task<ErrorHandleResult> HandleError(Exception exception, ExpandoObject message, TransactionScope transportTransaction, int processingAttempts)
+        protected async Task<ErrorHandleResult> HandleError(Exception exception, Message message, TransactionScope transportTransaction, int processingAttempts)
         {
             try
             {
@@ -218,10 +217,10 @@
             }
         }
 
-        async Task<bool> TryProcess(dynamic message, TransactionScope transportTransaction)
+        async Task<bool> TryProcess(Message message, TransactionScope transportTransaction)
         {
             FailureInfoStorage.ProcessingFailureInfo failure;
-            if (failureInfoStorage.TryGetFailureInfoForMessage(message.RowVersion.ToString(), out failure))
+            if (failureInfoStorage.TryGetFailureInfoForMessage(message.MessageId.ToString(), out failure))
             {
                 var errorHandlingResult = await HandleError(failure.Exception, message, transportTransaction, failure.NumberOfProcessingAttempts).ConfigureAwait(false);
 
@@ -238,12 +237,12 @@
             }
             catch (Exception exception)
             {
-                failureInfoStorage.RecordFailureInfoForMessage(message.RowVersion.ToString(), exception);
+                failureInfoStorage.RecordFailureInfoForMessage(message.MessageId.ToString(), exception);
                 return false;
             }
         }
 
-        async Task<bool> TryProcessingMessage(ExpandoObject message, TransactionScope transportTransaction)
+        async Task<bool> TryProcessingMessage(Message message, TransactionScope transportTransaction)
         {
             using (var pushCancellationTokenSource = new CancellationTokenSource())
             {
@@ -290,7 +289,6 @@
             catch (Exception ex)
             {
             }
-
             return messageCount;
         }       
     }
