@@ -9,13 +9,13 @@ namespace QueueProcessor
 {
     public class Message
     {
-        public Message(Guid messageId, ExpandoObject body)
+        public Message(Guid messageId, dynamic body)
         {
             MessageId = messageId;
             Body = body;
         }
         
-        public ExpandoObject Body { get; }
+        public dynamic Body { get; }
         public Guid MessageId { get; }
     }
 }

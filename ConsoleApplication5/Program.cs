@@ -19,11 +19,11 @@ namespace QueueProcessor
 
             await mp.Init(
                 context => 
-                {                    
-                    dynamic body = context.Message.Body;
+                {
+                    var rowVersion = context.Message.Body.RowVersion;
 
-                    if (body.RowVersion == 13170)
-                        throw new Exception($"Hata : {body.RowVersion}");
+                    if (rowVersion == 13170)
+                        throw new Exception($"Hata : {rowVersion}");
 
                     return Task.FromResult(0);
                 },
