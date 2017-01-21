@@ -30,7 +30,7 @@ namespace QueueProcessor
                 },
                 error =>
                 {
-                    return Task.FromResult(ErrorHandleResult.Handled);
+                    return Task.FromResult(ErrorHandleResult.RetryRequired);
                 },
                 "dbo.Test", 
                 "Data Source=.;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;");

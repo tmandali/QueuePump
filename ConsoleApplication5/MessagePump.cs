@@ -162,12 +162,7 @@
             dynamic message = null;
             try
             {
-                var transactionOptions = new TransactionOptions() {
-                    IsolationLevel = IsolationLevel.ReadCommitted,
-                    Timeout = TimeSpan.FromSeconds(30)
-                };
-
-                using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, transactionOptions, TransactionScopeAsyncFlowOption.Enabled))
+                using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted, Timeout = TimeSpan.FromSeconds(30) }, TransactionScopeAsyncFlowOption.Enabled))
                 using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
                 {
                     message = await TryReceive(connection, null, receiveCancellationTokenSource).ConfigureAwait(false);
@@ -262,7 +257,7 @@
         }
 
 
-            async Task<ExpandoObject> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationTokenSource receiveCancellationTokenSource)
+        async Task<ExpandoObject> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationTokenSource receiveCancellationTokenSource)
         {
             string receiveText = $@"
             DECLARE @NOCOUNT VARCHAR(3) = 'OFF';
@@ -358,9 +353,9 @@
 
         async Task<int> TryPeek(SqlConnection connection, CancellationToken token, int timeoutInSeconds = 30)
         {
-            var commandText = $"select count(*) from {inputQueue}";
+            var peekText = $"SELECT count(*) Id FROM {inputQueue} WITH (READPAST)";
 
-            using (var command = new SqlCommand(commandText, connection)
+            using (var command = new SqlCommand(peekText, connection)
             {
                 CommandTimeout = timeoutInSeconds
             })
