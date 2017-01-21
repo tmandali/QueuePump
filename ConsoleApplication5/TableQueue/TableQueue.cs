@@ -109,9 +109,9 @@ namespace QueueProcessor
                 Trace.TraceWarning(e.Message);
             else
                 throw new XmlSchemaValidationException(e.Message, e.Exception);
-        }        
+        }
 
-        async Task<Envelope> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationToken ct)
+        public virtual async Task<Envelope> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationToken ct)
         {
             string receiveText = $@"
             DECLARE @NOCOUNT VARCHAR(3) = 'OFF';

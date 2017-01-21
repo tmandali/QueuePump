@@ -32,7 +32,7 @@ namespace QueueProcessor
                 {
                     return Task.FromResult(ErrorHandleResult.RetryRequired);
                 },
-                "dbo.Test", 
+                new TableBaseQueue("dbo","Test"), 
                 "Data Source=.;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;");
 
             mp.Start();

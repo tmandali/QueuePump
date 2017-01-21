@@ -9,6 +9,7 @@
     using System.Threading;
     using System.Threading.Tasks;
     using System.Transactions;
+    //using static System.String;
 
     public class MessagePump
     {
@@ -16,14 +17,14 @@
         CancellationToken cancellationToken;
         CancellationTokenSource cancellationTokenSource;
         SemaphoreSlim concurrencyLimiter;
-        string inputQueue;
+        TableBaseQueue inputQueue;
         Task messagePumpTask;
         Func<MessageContext, Task> onMessage;
         Func<ErrorContext, Task<ErrorHandleResult>> onError;
         SqlConnectionFactory connectionFactory;
         FailureInfoStorage failureInfoStorage;
 
-        public async Task Init(Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError, string InputQueue, string connection)
+        public async Task Init(Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError, TableBaseQueue InputQueue, string connection)
         {
             this.inputQueue = InputQueue;
             this.onMessage = onMessage;
@@ -90,6 +91,7 @@
                 }
             }
         }
+
 
         async Task InnerProcessMessages()
         {
@@ -165,7 +167,7 @@
                 using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted, Timeout = TimeSpan.FromSeconds(30) }, TransactionScopeAsyncFlowOption.Enabled))
                 using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
                 {
-                    message = await TryReceive(connection, null, receiveCancellationTokenSource).ConfigureAwait(false);
+                    message = await inputQueue.TryReceive(connection, null, receiveCancellationTokenSource).ConfigureAwait(false);
 
                     if (message == null)
                     {
@@ -254,66 +256,7 @@
                 //  - false when message processing was aborted.
                 return !pushCancellationTokenSource.Token.IsCancellationRequested;
             }
-        }
-
-
-        async Task<ExpandoObject> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationTokenSource receiveCancellationTokenSource)
-        {
-            string receiveText = $@"
-            DECLARE @NOCOUNT VARCHAR(3) = 'OFF';
-            IF ( (512 & @@OPTIONS) = 512 ) SET @NOCOUNT = 'ON';
-            SET NOCOUNT ON;
-            
-            WITH message AS (SELECT TOP(1) * FROM {inputQueue} WITH (UPDLOCK, READPAST, ROWLOCK) WHERE [DeliveryDate] <= GETUTCDATE() ORDER BY [RowVersion]) 
-            DELETE FROM message
-            OUTPUT deleted.*;
-            IF(@NOCOUNT = 'ON') SET NOCOUNT ON;
-            IF(@NOCOUNT = 'OFF') SET NOCOUNT OFF;";
-
-            using (var command = new SqlCommand(receiveText, connection, transaction))
-            {
-                return await ReadMessage(command).ConfigureAwait(false);
-            }
-        }
-
-        static async Task<ExpandoObject> ReadMessage(SqlCommand command)
-        {
-            // We need sequential access to not buffer everything into memory
-            using (var dataReader = await command.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow | System.Data.CommandBehavior.SequentialAccess).ConfigureAwait(false))
-            {
-                if (!await dataReader.ReadAsync().ConfigureAwait(false))
-                {
-                    return null;
-                }
-
-                var readResult = await ReadRow(dataReader).ConfigureAwait(false);
-
-                return readResult;
-            }
-        }
-
-        static async Task<ExpandoObject> ReadRow(SqlDataReader dataReader)
-        {
-            var result = new ExpandoObject();
-
-            var properyBag = (ICollection<KeyValuePair<string, object>>) result;
-            for (int i = 0; i < dataReader.FieldCount; i++)
-            {
-                string name = dataReader.GetName(i);
-                properyBag.Add(new KeyValuePair<string, object>(name, await GetNullableAsync<object>(dataReader, i).ConfigureAwait(false)));
-            }
-
-            return result;
-        }
-
-        static async Task<T> GetNullableAsync<T>(SqlDataReader dataReader, int index) 
-        {
-            if (await dataReader.IsDBNullAsync(index).ConfigureAwait(false))
-            {
-                return default(T);
-            }
-            return await dataReader.GetFieldValueAsync<T>(index).ConfigureAwait(false);
-        }
+        }                  
 
         async Task<int> Peek(TimeSpan delay, CancellationToken cancellationToken)
         {
@@ -324,7 +267,7 @@
                 using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted }, TransactionScopeAsyncFlowOption.Enabled))
                 using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
                 {
-                    messageCount = await TryPeek(connection, cancellationToken).ConfigureAwait(false);
+                    messageCount = await inputQueue.TryPeek(connection, cancellationToken).ConfigureAwait(false);
 
 
                     if (messageCount == 0)
@@ -349,21 +292,6 @@
             }
 
             return messageCount;
-        }
-
-        async Task<int> TryPeek(SqlConnection connection, CancellationToken token, int timeoutInSeconds = 30)
-        {
-            var peekText = $"SELECT count(*) Id FROM {inputQueue} WITH (READPAST)";
-
-            using (var command = new SqlCommand(peekText, connection)
-            {
-                CommandTimeout = timeoutInSeconds
-            })
-            {
-                var numberOfMessages = (int)await command.ExecuteScalarAsync(token).ConfigureAwait(false);
-
-                return numberOfMessages;
-            }
-        }
+        }       
     }
 }
