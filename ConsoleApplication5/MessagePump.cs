@@ -19,13 +19,17 @@
         string inputQueue;
         Task messagePumpTask;
         Func<MessageContext, Task> onMessage;
+        Func<ErrorContext, Task<ErrorHandleResult>> onError;
         SqlConnectionFactory connectionFactory;
+        FailureInfoStorage failureInfoStorage;
 
-        public async Task Init(Func<MessageContext, Task> onMessage, string InputQueue, string connection)
+        public async Task Init(Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError, string InputQueue, string connection)
         {
             this.inputQueue = InputQueue;
             this.onMessage = onMessage;
+            this.onError = onError;
             this.connectionFactory = SqlConnectionFactory.Default(connection);
+            this.failureInfoStorage = new FailureInfoStorage(10000);
         }
 
         public void Start(int? maxConcurrency = null)
@@ -145,7 +149,7 @@
             }
             catch (Exception ex)
             {
-
+                
             }
             finally
             {
@@ -155,7 +159,7 @@
 
         async Task ReceiveMessage(CancellationTokenSource receiveCancellationTokenSource)
         {
-            ExpandoObject message = null;
+            dynamic message = null;
             try
             {
                 var transactionOptions = new TransactionOptions() {
@@ -180,11 +184,13 @@
                     connection.Close();
 
                     if (!await TryProcess(message, scope).ConfigureAwait(false))
-                    {
+                    {                        
                         return;
                     }
 
                     scope.Complete();
+
+                    failureInfoStorage.ClearFailureInfoForMessage(message.RowVersion.ToString());
                 }
 
             }
@@ -194,10 +200,53 @@
                 {
                     throw;
                 }
+
+                failureInfoStorage.RecordFailureInfoForMessage(message.RowVersion.ToString(), exception);
             }
         }
 
-        async Task<bool> TryProcess(ExpandoObject message, TransactionScope transportTransaction)
+        protected async Task<ErrorHandleResult> HandleError(Exception exception, ExpandoObject message, TransactionScope transportTransaction, int processingAttempts)
+        {
+            try
+            {
+                var errorContext = new ErrorContext(exception, message, transportTransaction, processingAttempts);
+
+                return await onError(errorContext).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+        //        criticalError.Raise($"Failed to execute reverability actions for message `{message.TransportId}`", ex);
+
+                return ErrorHandleResult.RetryRequired;
+            }
+        }
+
+        async Task<bool> TryProcess(dynamic message, TransactionScope transportTransaction)
+        {
+            FailureInfoStorage.ProcessingFailureInfo failure;
+            if (failureInfoStorage.TryGetFailureInfoForMessage(message.RowVersion.ToString(), out failure))
+            {
+                var errorHandlingResult = await HandleError(failure.Exception, message, transportTransaction, failure.NumberOfProcessingAttempts).ConfigureAwait(false);
+
+                if (errorHandlingResult == ErrorHandleResult.Handled)
+                {
+                    return true;
+                }
+            }
+
+            try
+            {
+                var messageProcessed = await TryProcessingMessage(message, transportTransaction).ConfigureAwait(false);
+                return messageProcessed;
+            }
+            catch (Exception exception)
+            {
+                failureInfoStorage.RecordFailureInfoForMessage(message.RowVersion.ToString(), exception);
+                return false;
+            }
+        }
+
+        async Task<bool> TryProcessingMessage(ExpandoObject message, TransactionScope transportTransaction)
         {
             using (var pushCancellationTokenSource = new CancellationTokenSource())
             {
@@ -212,7 +261,8 @@
             }
         }
 
-        async Task<ExpandoObject> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationTokenSource receiveCancellationTokenSource)
+
+            async Task<ExpandoObject> TryReceive(SqlConnection connection, SqlTransaction transaction, CancellationTokenSource receiveCancellationTokenSource)
         {
             string receiveText = $@"
             DECLARE @NOCOUNT VARCHAR(3) = 'OFF';

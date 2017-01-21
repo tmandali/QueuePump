@@ -47,6 +47,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ErrorContext.cs" />
+    <Compile Include="FailureInfoStorage.cs" />
     <Compile Include="MessagePump.cs" />
     <Compile Include="MessageContext.cs" />
     <Compile Include="TableQueue\Service.cs" />

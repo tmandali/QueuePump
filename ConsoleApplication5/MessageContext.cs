@@ -1,8 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Dynamic;
+﻿using System.Dynamic;
 using System.Threading;
 using System.Transactions;
-using System.Linq;
 
 namespace QueueProcessor
 {

@@ -18,14 +18,19 @@ namespace QueueProcessor
             var mp = new MessagePump();
 
             await mp.Init(
-                context => {
-                    var propertyBag = (ICollection<KeyValuePair<string, object>>) context.Body;
-                    propertyBag.Select(s => $"{s.Key}:{s.Value}")
-                    .ToList()
-                    .ForEach(f => {
-                        Console.WriteLine(f);
-                    });                    
+                context => 
+                {
+                    //var propertyBag = (ICollection<KeyValuePair<string, object>>) context.Body;
+                    dynamic obj = context.Body;
+
+                    if (obj.RowVersion == 9178)
+                        throw new Exception($"Hata : {obj.RowVersion}");                    
+
                     return Task.FromResult(0);
+                },
+                error =>
+                {
+                    return Task.FromResult(ErrorHandleResult.Handled);
                 },
                 "dbo.Test", 
                 "Data Source=.;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;");
