@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Linq;
-
-namespace QueueProcessor
+﻿namespace QueueProcessor
 {
+    using System;
+    using System.Threading.Tasks;
+
     class Program
     {       
         static void Main(string[] args)

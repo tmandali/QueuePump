@@ -1,9 +1,8 @@
-﻿using System.Dynamic;
-using System.Threading;
-using System.Transactions;
-
-namespace QueueProcessor
+﻿namespace QueueProcessor
 {
+    using System.Threading;
+    using System.Transactions;
+
     public class MessageContext
     {        
         public MessageContext(Message message, TransactionScope transportTransaction, CancellationTokenSource receiveCancellationTokenSource)
