@@ -7,7 +7,7 @@
     using System.Threading;
     using System.Threading.Tasks;
     using System.Transactions;
-
+    
     public class MessagePump
     {
         ConcurrentDictionary<Task, Task> runningReceiveTasks;
@@ -18,15 +18,17 @@
         Task messagePumpTask;
         Func<MessageContext, Task> onMessage;
         Func<ErrorContext, Task<ErrorHandleResult>> onError;
+        Func<Task> onComplete;
         SqlConnectionFactory connectionFactory;
         FailureInfoStorage failureInfoStorage;
 
-        public async Task Init(Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError, TableBaseQueue InputQueue, string connection)
+        public async Task Init(Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError, Func<Task> onComplete, TableBaseQueue inputQueue, string connectionString)
         {
-            this.inputQueue = InputQueue;
+            this.inputQueue = inputQueue;
             this.onMessage = onMessage;
             this.onError = onError;
-            this.connectionFactory = SqlConnectionFactory.Default(connection);
+            this.onComplete = onComplete;
+            this.connectionFactory = SqlConnectionFactory.Default(connectionString);
             this.failureInfoStorage = new FailureInfoStorage(10000);
         }
 
@@ -128,7 +130,21 @@
                         receiveTasks.TryRemove(t, out toBeRemoved);
                     }, runningReceiveTasks, TaskContinuationOptions.ExecuteSynchronously);                    
                 }
+
+                await Complete(cancellationToken).ConfigureAwait(false);
             }
+        }
+
+        async Task Complete(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await onComplete().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                
+            }            
         }
 
         async Task InnerReceive(CancellationTokenSource loopCancellationTokenSource)
