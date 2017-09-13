@@ -11,7 +11,7 @@
     using System.Linq;
     using static System.String;
 
-    public class TableBaseQueue
+    public class TableBasedQueue
     {
         string tableName;
         string schemaName;
@@ -23,7 +23,7 @@
             return $"{schemaName}.{tableName}";
         }
 
-        public TableBaseQueue(string schemaName, string tableName, IEnumerable<string> keys)
+        public TableBasedQueue(string schemaName, string tableName, IEnumerable<string> keys)
         {            
             using (var sanitizer = new SqlCommandBuilder())
             {

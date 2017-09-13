@@ -9,28 +9,26 @@
     using System.Threading.Tasks;
     using System.Transactions;
     
-    public class MessagePump
+    class MessagePump
     {
         ConcurrentDictionary<Task, Task> runningReceiveTasks;
         CancellationToken cancellationToken;
         CancellationTokenSource cancellationTokenSource;
         SemaphoreSlim concurrencyLimiter;
-        TableBaseQueue inputQueue;
+        TableBasedQueue inputQueue;
         Task messagePumpTask;
         Func<MessageContext, Task> onMessage;
         Func<ErrorContext, Task<ErrorHandleResult>> onError;
-        Func<Task> onComplete;
-        SqlConnectionFactory connectionFactory;
+        SqlConnectionFactory sqlConnectionFactory;
         FailureInfoStorage failureInfoStorage;
         static ILogger Logger = LogManager.GetLogger<MessagePump>();
 
-        public async Task Init(Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError, Func<Task> onComplete, TableBaseQueue inputQueue, string connectionString)
+        public async Task Init(SqlConnectionFactory sqlConnectionFactory, TableBasedQueue inputQueue, Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError)
         {
             this.inputQueue = inputQueue;
             this.onMessage = onMessage;
             this.onError = onError;
-            this.onComplete = onComplete;
-            this.connectionFactory = SqlConnectionFactory.Default(connectionString);
+            this.sqlConnectionFactory =   sqlConnectionFactory;
             this.failureInfoStorage = new FailureInfoStorage(10000);
         }
 
@@ -132,22 +130,8 @@
                         receiveTasks.TryRemove(t, out toBeRemoved);
                     }, runningReceiveTasks, TaskContinuationOptions.ExecuteSynchronously);                    
                 }
-
-                await Complete(cancellationToken).ConfigureAwait(false);
             }
-        }
-
-        async Task Complete(CancellationToken cancellationToken)
-        {
-            try
-            {
-                await onComplete().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                
-            }            
-        }
+        }      
 
         async Task InnerReceive(CancellationTokenSource loopCancellationTokenSource)
         {
@@ -181,7 +165,7 @@
             try
             {
                 using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted, Timeout = TimeSpan.FromSeconds(30) }, TransactionScopeAsyncFlowOption.Enabled))
-                using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
+                using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
                 {
                     message = await inputQueue.TryReceive(connection, null, receiveCancellationTokenSource).ConfigureAwait(false);
 
@@ -281,15 +265,14 @@
             try
             {
                 using (var scope = new TransactionScope(TransactionScopeOption.RequiresNew, new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted }, TransactionScopeAsyncFlowOption.Enabled))
-                using (var connection = await connectionFactory.OpenNewConnection().ConfigureAwait(false))
+                using (var connection = await sqlConnectionFactory.OpenNewConnection().ConfigureAwait(false))
                 {
                     messageCount = await inputQueue.TryPeek(connection, cancellationToken).ConfigureAwait(false);
 
 
                     if (messageCount == 0)
                     {
-                    //    Logger.Debug($"Input queue empty. Next peek operation will be delayed for {settings.Delay}.");
-
+                        Logger.LogDebug($"Input queue empty. Next peek operation will be delayed for {delay}.");
                         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     }
 
@@ -302,9 +285,11 @@
             }
             catch (SqlException e) when (cancellationToken.IsCancellationRequested)
             {
+                Logger.LogDebug("Exception thrown during cancellation", e);
             }
             catch (Exception ex)
             {
+                Logger.LogWarning("Sql peek operation failed", ex);
             }
             return messageCount;
         }       
