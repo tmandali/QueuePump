@@ -1,5 +1,6 @@
 ﻿namespace QueueProcessor
 {
+    using Microsoft.Extensions.Logging;
     using System;
     using System.Collections.Concurrent;
     using System.Data.SqlClient;
@@ -21,6 +22,7 @@
         Func<Task> onComplete;
         SqlConnectionFactory connectionFactory;
         FailureInfoStorage failureInfoStorage;
+        static ILogger Logger = LogManager.GetLogger<MessagePump>();
 
         public async Task Init(Func<MessageContext, Task> onMessage, Func<ErrorContext, Task<ErrorHandleResult>> onError, Func<Task> onComplete, TableBaseQueue inputQueue, string connectionString)
         {
@@ -59,7 +61,7 @@
 
             if (finishedTask.Equals(timeoutTask))
             {
-                //Logger.ErrorFormat("The message pump failed to stop within the time allowed ({0}s)", timeoutDurationInSeconds);
+                Logger.LogError("The message pump failed to stop within the time allowed ({0}s)", timeoutDurationInSeconds);
             }
 
             concurrencyLimiter.Dispose();
@@ -82,11 +84,11 @@
                 }
                 catch (SqlException e) when (cancellationToken.IsCancellationRequested)
                 {
-                    
+                    Logger.LogDebug("Exception thrown during cancellation", e);
                 }
                 catch (Exception ex)
                 {
-
+                    Logger.LogError("Sql Message pump failed", ex);
                 }
             }
         }
@@ -161,10 +163,11 @@
             catch (SqlException e) when (e.Number == 1205)
             {
                 //Receive has been victim of a lock resolution
+                Logger.LogWarning("Sql receive operation failed.", e);
             }
             catch (Exception ex)
             {
-                
+                Logger.LogWarning("Sql receive operation failed.", ex);
             }
             finally
             {

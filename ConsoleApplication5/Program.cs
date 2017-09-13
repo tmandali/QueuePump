@@ -1,5 +1,7 @@
 ﻿namespace QueueProcessor
 {
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Logging.Console;
     using System;
     using System.Threading.Tasks;
 
@@ -10,7 +12,7 @@
             var svc = new Service();
             AsyncMain(svc).GetAwaiter().GetResult();
         }
-
+       
         async static Task AsyncMain(Service svc)
         {
             var mp = new MessagePump();
@@ -34,7 +36,7 @@
                     return Task.FromResult(true);
                 },
                 new TableBaseQueue("dbo","Test", new[] {"RowVersion"}), 
-                "Data Source=.;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;");
+                "Data Source=.;Initial Catalog=nservicebus;Integrated Security=True;Connection Timeout=10;Polling=false");
 
             mp.Start();
             Console.ReadLine();
