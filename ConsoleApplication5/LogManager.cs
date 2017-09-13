@@ -4,6 +4,6 @@
     static class LogManager
     {
         static ILoggerFactory LoggerFactory { get; } = new LoggerFactory();
-        public static ILogger GetLogger<T>() => LoggerFactory.AddConsole().CreateLogger<T>();
+        public static ILogger GetLogger<T>() => LoggerFactory.AddConsole(LogLevel.Information).CreateLogger<T>();
     }
 }
