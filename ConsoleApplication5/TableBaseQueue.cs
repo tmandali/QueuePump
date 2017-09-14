@@ -53,7 +53,7 @@
             IF ( (512 & @@OPTIONS) = 512 ) SET @NOCOUNT = 'ON';
             SET NOCOUNT ON;
             
-            WITH message AS (SELECT TOP(1) * FROM {schemaName}.{tableName} WITH (UPDLOCK, READPAST, ROWLOCK) WHERE [DeliveryDate] <= GETUTCDATE() ORDER BY [RowVersion]) 
+            WITH message AS (SELECT TOP(1) * FROM {schemaName}.{tableName} WITH (UPDLOCK, READPAST, ROWLOCK) ORDER BY [RowVersion]) 
             DELETE FROM message
             OUTPUT deleted.*;
             IF(@NOCOUNT = 'ON') SET NOCOUNT ON;

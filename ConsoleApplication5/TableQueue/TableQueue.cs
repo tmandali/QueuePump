@@ -118,7 +118,7 @@ namespace QueueProcessor
             IF ( (512 & @@OPTIONS) = 512 ) SET @NOCOUNT = 'ON';
             SET NOCOUNT ON;
             
-            WITH message AS (SELECT TOP(1) * FROM {tableName} WITH (UPDLOCK, READPAST, ROWLOCK) WHERE [DeliveryDate] <= GETUTCDATE() ORDER BY [RowVersion]) 
+            WITH message AS (SELECT TOP(1) * FROM {tableName} WITH (UPDLOCK, READPAST, ROWLOCK) ORDER BY [RowVersion]) 
             DELETE FROM message
             OUTPUT deleted.*;
             IF(@NOCOUNT = 'ON') SET NOCOUNT ON;
@@ -144,24 +144,24 @@ namespace QueueProcessor
 
         async Task Rollback(SqlConnection connection, SqlTransaction transaction, CancellationToken ct, Envelope envelope, Exception ex)
         {
-            var rec = (ICollection<KeyValuePair<string, object>>)envelope.Headers;
-            rec.Add(new KeyValuePair<string, object>("ReplyTo", envelope.ReplyTo.ToString()));
-            rec.Add(new KeyValuePair<string, object>("EndPoint", envelope.EndPoint.ToString()));
-            rec.Add(new KeyValuePair<string, object>("DeliveryDate", envelope.DeliveryDate.AddHours(1)));
-            rec.Add(new KeyValuePair<string, object>("Error",  $"{ex.GetType()}:\r{ex.Message}" ));
-            rec.Add(new KeyValuePair<string, object>("RowVersion", envelope.RowVersion));                        
+            //var rec = (ICollection<KeyValuePair<string, object>>)envelope.Headers;
+            //rec.Add(new KeyValuePair<string, object>("ReplyTo", envelope.ReplyTo.ToString()));
+            //rec.Add(new KeyValuePair<string, object>("EndPoint", envelope.EndPoint.ToString()));
+            //rec.Add(new KeyValuePair<string, object>("DeliveryDate", envelope.DeliveryDate.AddHours(1)));
+            //rec.Add(new KeyValuePair<string, object>("Error",  $"{ex.GetType()}:\r{ex.Message}" ));
+            //rec.Add(new KeyValuePair<string, object>("RowVersion", envelope.RowVersion));                        
 
-            var fields = string.Join(",", rec.Select(r => r.Key));
-            var fieldPrms = string.Join(",", rec.Select(r => "@" + r.Key));
-            var cmdPrms = rec.Select(r => new SqlParameter("@" + r.Key, r.Value)).ToArray();
+            //var fields = string.Join(",", rec.Select(r => r.Key));
+            //var fieldPrms = string.Join(",", rec.Select(r => "@" + r.Key));
+            //var cmdPrms = rec.Select(r => new SqlParameter("@" + r.Key, r.Value)).ToArray();
 
-            string rollbackText = $@"insert into {tableName} ({fields}) values ({fieldPrms})";
+            //string rollbackText = $@"insert into {tableName} ({fields}) values ({fieldPrms})";
 
-            using (var command = new SqlCommand(rollbackText, connection, transaction))
-            {
-                command.Parameters.AddRange(cmdPrms);
-                await command.ExecuteNonQueryAsync().ConfigureAwait(false);
-            }
+            //using (var command = new SqlCommand(rollbackText, connection, transaction))
+            //{
+            //    command.Parameters.AddRange(cmdPrms);
+            //    await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+            //}
         }
     }
 }

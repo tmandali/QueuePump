@@ -82,11 +82,11 @@
                 }
                 catch (SqlException e) when (cancellationToken.IsCancellationRequested)
                 {
-                    Logger.LogDebug("Exception thrown during cancellation", e);
+                    Logger.LogDebug(e, "Exception thrown during cancellation");
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Sql Message pump failed", ex);
+                    Logger.LogError(ex, "Sql Message pump failed");
                 }
             }
         }
@@ -147,11 +147,11 @@
             catch (SqlException e) when (e.Number == 1205)
             {
                 //Receive has been victim of a lock resolution
-                Logger.LogWarning("Sql receive operation failed.", e);
+                Logger.LogWarning(e, "Sql receive operation failed.");
             }
             catch (Exception ex)
             {
-                Logger.LogWarning("Sql receive operation failed.", ex);
+                Logger.LogWarning(ex, "Sql receive operation failed.");
             }
             finally
             {
@@ -210,7 +210,7 @@
 
                 return await onError(errorContext).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
         //        criticalError.Raise($"Failed to execute reverability actions for message `{message.TransportId}`", ex);
 
@@ -285,11 +285,11 @@
             }
             catch (SqlException e) when (cancellationToken.IsCancellationRequested)
             {
-                Logger.LogDebug("Exception thrown during cancellation", e);
+                Logger.LogDebug(e, "Exception thrown during cancellation");
             }
             catch (Exception ex)
             {
-                Logger.LogWarning("Sql peek operation failed", ex);
+                Logger.LogWarning(ex, "Sql peek operation failed");
             }
             return messageCount;
         }       

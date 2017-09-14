@@ -2,13 +2,16 @@
 {
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Logging;
     using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
 
     class Program
     {
-        public static IConfigurationRoot Configuration { get; set; }
+        static ILogger Logger = LogManager.GetLogger<Program>();
+
+        static IConfigurationRoot Configuration { get; set; }
 
         static void Main(string[] args)
         {
@@ -43,15 +46,11 @@
             var mp =  serviceProvider.GetService<MessagePump>();
 
             await mp.Init(
-                SqlConnectionFactory.Default("Data Source=localhost,1401;Initial Catalog=TestDB;User Id=sa;Password=tbmX1821;Connection Timeout=10"),
-                new TableBasedQueue("dbo", "Test", new[] { "RowVersion" }),
+                SqlConnectionFactory.Default("Data Source=localhost,1401;Initial Catalog=TestDB;User Id=sa;Password=tbmX1821;Connection Timeout=10;"),
+                new TableBasedQueue("dbo", "CTQueue_Test", new[] { "RowVersion" }),
                 context => 
                 {
                     var rowVersion = context.Message.Body.RowVersion;
-
-                    if (rowVersion == 13170)
-                        throw new Exception($"Hata : {rowVersion}");
-
                     return Task.FromResult(0);
                 },
                 error => Task.FromResult(ErrorHandleResult.RetryRequired)
